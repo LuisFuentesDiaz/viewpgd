@@ -1,12 +1,24 @@
 <div class="player-page">
+  <header class="player-header">
+    <button type="button" class="btn-back" (click)="goBack()" aria-label="Volver">
+      ← Volver
+    </button>
+    <h1 class="player-title">{{ title() }}</h1>
+  </header>
+
   @if (videoUrl(); as url) {
-    <iframe
-    width="100%"
-    height="500"
-    [src]="url"
-    allow="autoplay"
-  ></iframe>
+    <div class="video-wrap">
+      <iframe
+        class="video"
+        [src]="url"
+        title="Reproductor"
+        allow="fullscreen; autoplay; picture-in-picture"
+        allowfullscreen
+      ></iframe>
+    </div>
   } @else {
-    <p class="no-video">No se ha seleccionado ningún video. Cierra esta ventana y elige una película en la lista.</p>
+    <div class="no-video">
+      <p>No hay ningún video. <a routerLink="/catalog">Elige una película en el catálogo</a>.</p>
+    </div>
   }
 </div>

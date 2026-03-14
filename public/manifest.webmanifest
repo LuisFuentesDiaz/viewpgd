@@ -1,8 +1,8 @@
 {
   "name": "Ver películas",
   "short_name": "Viewpgd",
-  "theme_color": "#0c0a09",
-  "background_color": "#0c0a09",
+  "theme_color": "#0a0a0a",
+  "background_color": "#0a0a0a",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

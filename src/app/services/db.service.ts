@@ -103,13 +103,29 @@ export class DbService {
     await this.savePersistedDb(buffer);
   }
 
-  /** Devuelve el total de películas (una por name+year), opcionalmente filtradas por nombre. */
-  async getMoviesCount(search?: string): Promise<number> {
+  /** Años distintos con películas, ordenados descendente (más reciente primero). */
+  async getYears(): Promise<number[]> {
     const db = await this.openDb();
     try {
-      const where = search?.trim()
-        ? ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`
-        : '';
+      const result = db.exec(
+        `SELECT DISTINCT year FROM (SELECT name, year FROM ${CATALOG_VIEW} GROUP BY name, year) ORDER BY year DESC`
+      );
+      db.close();
+      if (!result.length || !result[0].values.length) return [];
+      return result[0].values.map((row) => Number(row[0])).filter((y) => !Number.isNaN(y));
+    } catch {
+      db.close();
+      return [];
+    }
+  }
+
+  /** Devuelve el total de películas (una por name+year), opcionalmente filtradas por nombre y/o año. */
+  async getMoviesCount(search?: string, year?: number): Promise<number> {
+    const db = await this.openDb();
+    try {
+      let where = '';
+      if (search?.trim()) where += ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
+      if (year != null && !Number.isNaN(year)) where += (where ? ' AND ' : ' WHERE ') + ` year = ${year}`;
       const result = db.exec(
         `SELECT COUNT(*) AS n FROM (SELECT name, year FROM ${CATALOG_VIEW}${where} GROUP BY name, year)`
       );
@@ -122,18 +138,27 @@ export class DbService {
     }
   }
 
-  /** Devuelve una página de películas (una por name+year, un solo link). Opcional filtro por nombre. */
-  async getMoviesPage(offset: number, limit: number, search?: string): Promise<Movie[]> {
+  /** orderBy: 'year' | 'name', order: 'asc' | 'desc'. Opcional year para filtrar por año. */
+  async getMoviesPage(
+    offset: number,
+    limit: number,
+    search?: string,
+    orderBy: 'year' | 'name' = 'year',
+    order: 'asc' | 'desc' = 'desc',
+    year?: number
+  ): Promise<Movie[]> {
     const db = await this.openDb();
     try {
-      const where = search?.trim()
-        ? ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`
-        : '';
+      let where = '';
+      if (search?.trim()) where += ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
+      if (year != null && !Number.isNaN(year)) where += (where ? ' AND ' : ' WHERE ') + ` year = ${year}`;
+      const ob = orderBy === 'name' ? 'name' : 'year';
+      const dir = order === 'asc' ? 'ASC' : 'DESC';
       const result = db.exec(
         `SELECT * FROM (
           SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
           FROM ${CATALOG_VIEW}${where}
-        ) t WHERE rn = 1 ORDER BY year DESC LIMIT ${Math.max(0, limit)} OFFSET ${Math.max(0, offset)}`
+        ) t WHERE rn = 1 ORDER BY ${ob} ${dir} LIMIT ${Math.max(0, limit)} OFFSET ${Math.max(0, offset)}`
       );
       db.close();
       if (!result.length || !result[0].values.length) return [];
@@ -171,6 +196,30 @@ export class DbService {
       buffer = await response.arrayBuffer();
     }
     return new SQL.Database(new Uint8Array(buffer));
+  }
+
+  /** Devuelve una película aleatoria del catálogo (una por name+year). */
+  async getRandomMovie(): Promise<Movie | null> {
+    const db = await this.openDb();
+    try {
+      const result = db.exec(
+        `SELECT * FROM (
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
+          FROM ${CATALOG_VIEW}
+        ) t WHERE rn = 1 ORDER BY RANDOM() LIMIT 1`
+      );
+      db.close();
+      if (!result.length || !result[0].values.length) return null;
+      const { columns, values } = result[0];
+      const colIdx = columns.indexOf('rn');
+      const cols = colIdx >= 0 ? columns.filter((_, i) => i !== colIdx) : columns;
+      const row = values[0] as (string | number | null)[];
+      const r = colIdx >= 0 ? row.filter((_, i) => i !== colIdx) : row;
+      return this.rowToMovie(cols, r, 0);
+    } catch {
+      db.close();
+      return null;
+    }
   }
 
   /** Lee la vista v_movies_catalog; una fila por película (name+year), un solo link. */

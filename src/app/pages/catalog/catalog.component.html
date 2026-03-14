@@ -1,0 +1,203 @@
+<div class="catalog-page">
+  <div class="catalog-top-bar" [class.nav--hidden]="showFullCatalog() && !navVisible()">
+    <header class="nav">
+      <div class="nav-row">
+        @if (showFullCatalog()) {
+            <button type="button" class="nav-brand" (click)="showCarouselsView()" aria-label="Volver al menú">
+              <img src="assets/icon.png" alt="" class="nav-brand-icon" width="28" height="28" />
+              <span>Viewpgd</span>
+            </button>
+          } @else {
+            <a class="nav-brand" routerLink="/catalog">
+              <img src="assets/icon.png" alt="" class="nav-brand-icon" width="28" height="28" />
+              <span>Viewpgd</span>
+            </a>
+          }
+        <div class="nav-spacer"></div>
+        <nav class="nav-actions">
+          @if (showFullCatalog()) {
+            @if (!loading() && !error()) {
+              <span class="nav-count">{{ displayedMovies().length }}{{ totalCount() !== null ? ' de ' + totalCount() : '' }}</span>
+            }
+          }
+          <button type="button" class="nav-item" (click)="playRandom()">Aleatoria</button>
+          @if (!showFullCatalog()) {
+            <button type="button" class="nav-item nav-item--muted" (click)="confirmRemoveDb()">Quitar BD</button>
+          }
+        </nav>
+      </div>
+      @if (showFullCatalog() && !loading() && !error()) {
+        <div class="toolbar">
+          <select
+            class="select-sort"
+            [value]="orderBy() + '-' + order()"
+            (change)="onOrderChange($event)"
+            aria-label="Ordenar por"
+          >
+            <option value="year-desc">Año (más reciente)</option>
+            <option value="year-asc">Año (más antiguo)</option>
+            <option value="name-asc">Nombre (A-Z)</option>
+            <option value="name-desc">Nombre (Z-A)</option>
+          </select>
+          <button
+            type="button"
+            class="btn-toggle"
+            [class.active]="favoritesOnly()"
+            (click)="toggleFavoritesOnly()"
+            aria-pressed="favoritesOnly()"
+            title="Solo favoritos"
+          >
+            ♥
+          </button>
+          <button
+            type="button"
+            class="btn-toggle"
+            (click)="toggleViewMode()"
+            [attr.aria-label]="viewMode() === 'grid' ? 'Vista lista' : 'Vista grid'"
+            title="{{ viewMode() === 'grid' ? 'Vista en lista' : 'Vista en grid' }}"
+          >
+            {{ viewMode() === 'grid' ? '☷' : '⊞' }}
+          </button>
+          <input
+            type="search"
+            class="filter-input"
+            [value]="filterQuery()"
+            (input)="onFilterInput($any($event.target).value)"
+            placeholder="Buscar…"
+            aria-label="Buscar películas"
+          />
+        </div>
+      }
+    </header>
+  </div>
+
+  <main class="catalog-main">
+  @if (!showFullCatalog()) {
+    <!-- Vista carruseles por año -->
+    @if (carouselsLoading()) {
+      <div class="message message--loading">Cargando…</div>
+    } @else {
+      @if (lastWatched(); as last) {
+        <section class="continue-section" aria-label="Continuar viendo">
+          <h2 class="section-title">Continuar viendo</h2>
+          <div class="continue-row">
+            <button type="button" class="continue-card" (click)="continueWatching()">
+              @if (last.poster) {
+                <img [src]="last.poster" [alt]="last.title" class="continue-poster" />
+              } @else {
+                <span class="continue-poster-placeholder">▶</span>
+              }
+              <span class="continue-title">{{ last.title }}</span>
+              <span class="continue-year">{{ last.year }}</span>
+            </button>
+          </div>
+        </section>
+      }
+
+      @for (carousel of carousels(); track carousel.year) {
+        <section class="carousel-section" [attr.aria-label]="'Películas de ' + carousel.year">
+          <h2 class="section-title">{{ carousel.year }}</h2>
+          <div class="carousel-row">
+            @for (movie of carousel.movies; track movie.id) {
+              <article class="movie-card movie-card--carousel" (click)="playMovie(movie)">
+                <div class="movie-poster-wrap">
+                  @if (movie.poster) {
+                    <img
+                      class="movie-poster"
+                      [src]="movie.poster"
+                      [alt]="movie.title"
+                      loading="lazy"
+                      (load)="onPosterLoad($event)"
+                    />
+                  } @else {
+                    <span class="movie-poster-placeholder">▶</span>
+                  }
+                  <span class="play-overlay" aria-hidden="true"><span class="play-icon">▶</span></span>
+                  <button
+                    type="button"
+                    class="btn-fav"
+                    [class.btn-fav--on]="isFavorite(movie.id)"
+                    (click)="toggleFavorite($event, movie.id)"
+                    [attr.aria-label]="isFavorite(movie.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
+                  >
+                    ♥
+                  </button>
+                </div>
+                <div class="movie-info">
+                  <h3 class="movie-title" [title]="movie.title">{{ movie.title }}</h3>
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      <section class="ver-todo-section">
+        <button type="button" class="btn-ver-todo" (click)="showFullCatalogView()">
+          Ver todo el catálogo
+        </button>
+      </section>
+    }
+  } @else {
+    <!-- Vista catálogo completo -->
+    @if (loading()) {
+      <div class="message message--loading">Cargando películas…</div>
+    } @else if (error()) {
+      <p class="message error">{{ error() }}</p>
+    } @else {
+      <section class="library-section" aria-label="Catálogo completo">
+        @if (!filterQuery() && !favoritesOnly()) {
+          <h2 class="section-title">Todas las películas</h2>
+        }
+        <ul
+          #movieGrid
+          class="movie-list"
+          [class.movie-list--grid]="viewMode() === 'grid'"
+          [class.movie-list--rows]="viewMode() === 'list'"
+          (scroll)="onListScroll($event)"
+        >
+          @for (movie of displayedMovies(); track movie.id) {
+            <li>
+              <article class="movie-card" (click)="playMovie(movie)">
+                <div class="movie-poster-wrap">
+                  @if (movie.poster) {
+                    <img
+                      class="movie-poster"
+                      [src]="movie.poster"
+                      [alt]="movie.title"
+                      loading="lazy"
+                      (load)="onPosterLoad($event)"
+                    />
+                  } @else {
+                    <span class="movie-poster-placeholder">▶</span>
+                  }
+                  <span class="play-overlay" aria-hidden="true"><span class="play-icon">▶</span></span>
+                  <button
+                    type="button"
+                    class="btn-fav"
+                    [class.btn-fav--on]="isFavorite(movie.id)"
+                    (click)="toggleFavorite($event, movie.id)"
+                    [attr.aria-label]="isFavorite(movie.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
+                  >
+                    ♥
+                  </button>
+                </div>
+                <div class="movie-info">
+                  <h2 class="movie-title" [title]="movie.title">{{ movie.title }}</h2>
+                  <span class="movie-year">{{ movie.year }}</span>
+                </div>
+              </article>
+            </li>
+          }
+          <li class="sentinel-li">
+            <div #loadMoreSentinel class="load-more-sentinel"></div>
+          </li>
+        </ul>
+        @if (loadingMore()) {
+          <p class="message message--loading-more">Cargando más…</p>
+        }
+      </section>
+    }
+  }
+  </main>
+</div>

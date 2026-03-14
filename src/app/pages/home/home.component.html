@@ -1,0 +1,29 @@
+<div class="home-page">
+  @if (!hasDb && !loading()) {
+    <div class="welcome">
+      <input
+        #fileInput
+        type="file"
+        accept=".db,.sqlite,.sqlite3"
+        class="file-input"
+        (change)="onFileSelected($event)"
+        aria-label="Seleccionar base de datos"
+      />
+      <div class="welcome-card">
+        <h1 class="welcome-title">Viewpgd</h1>
+        <p class="welcome-text">Tu catálogo de películas en un solo lugar</p>
+        <p class="welcome-hint">Carga tu archivo SQLite con la vista <code>v_movies_catalog</code> para empezar.</p>
+        @if (error()) {
+          <p class="welcome-error">{{ error() }}</p>
+        }
+        <button type="button" class="btn-primary" (click)="fileInput.click()">
+          Cargar base de datos
+        </button>
+      </div>
+    </div>
+  } @else if (loading()) {
+    <div class="loading-state">
+      <p>Cargando…</p>
+    </div>
+  }
+</div>

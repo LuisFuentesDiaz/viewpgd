@@ -1,15 +1,18 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-player',
   standalone: true,
+  imports: [RouterLink],
   templateUrl: './player.component.html',
   styleUrl: './player.component.css',
 })
 export class PlayerComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private sanitizer = inject(DomSanitizer);
 
   videoUrl = signal<SafeResourceUrl | null>(null);
@@ -26,5 +29,9 @@ export class PlayerComponent implements OnInit {
         this.title.set(decodeURIComponent(titleParam));
       }
     });
+  }
+
+  goBack(): void {
+    this.router.navigate(['/catalog']);
   }
 }
