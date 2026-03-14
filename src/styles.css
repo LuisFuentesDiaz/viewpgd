@@ -1,3 +1,28 @@
 /* You can add global styles to this file, and also import other style files */
 
 @import 'tailwindcss';
+
+:root {
+  --vp-font-display: 'Bebas Neue', sans-serif;
+  --vp-font-body: 'Outfit', system-ui, sans-serif;
+  --vp-bg: #0c0a09;
+  --vp-surface: #1c1917;
+  --vp-surface-elevated: #292524;
+  --vp-accent: #f59e0b;
+  --vp-accent-glow: rgba(245, 158, 11, 0.4);
+  --vp-cyan: #22d3ee;
+  --vp-cyan-dim: rgba(34, 211, 238, 0.15);
+  --vp-text: #fafaf9;
+  --vp-text-muted: #a8a29e;
+  --vp-border: rgba(255, 255, 255, 0.08);
+  --vp-radius: 12px;
+  --vp-radius-lg: 20px;
+  --vp-shadow-glow: 0 0 40px var(--vp-accent-glow);
+}
+
+body {
+  font-family: var(--vp-font-body);
+  background: var(--vp-bg);
+  color: var(--vp-text);
+  -webkit-font-smoothing: antialiased;
+}
