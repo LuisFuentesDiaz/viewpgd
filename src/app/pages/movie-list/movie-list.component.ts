@@ -96,6 +96,10 @@ export class MovieListComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  onPosterLoad(event: Event): void {
+    (event.target as HTMLImageElement).classList.add('loaded');
+  }
+
   playHere(movie: Movie): void {
     this.currentVideoUrl.set(
       movie.videoUrl

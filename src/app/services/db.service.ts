@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { APP_BASE_HREF } from '@angular/common';
+import { Inject, Injectable, Optional } from '@angular/core';
 import type { Movie } from '../models/movie';
 
 const DB_PATH = 'assets/scrapgd.db';
@@ -12,6 +13,8 @@ export class DbService {
   private initSqlJs: typeof import('sql.js').default | null = null;
   /** Buffer de la BD cargada por el usuario; null = usar la BD por defecto (assets). */
   private customDbBuffer: ArrayBuffer | null = null;
+
+  constructor(@Optional() @Inject(APP_BASE_HREF) private baseHref: string | null) {}
 
   /** Indica si se está usando una base de datos cargada por el usuario. */
   hasCustomDb(): boolean {
@@ -98,8 +101,11 @@ export class DbService {
   /** Lee la vista v_movies_catalog y devuelve los registros como Movie[]. Usa BD por defecto o la cargada por el usuario. */
   async getMovies(): Promise<Movie[]> {
     const initSqlJs = await this.loadSqlJs();
+    const baseRaw = this.baseHref ?? '/';
+    const base = baseRaw.endsWith('/') ? baseRaw : baseRaw + '/';
+    const baseUrl = typeof location !== 'undefined' ? new URL(base, location.origin).href : base;
     const SQL = await initSqlJs({
-      locateFile: (file: string) => `/${file}`,
+      locateFile: (file: string) => `${baseUrl}${file}`,
     });
 
     let buffer: ArrayBuffer;
