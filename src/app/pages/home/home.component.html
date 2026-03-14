@@ -1,28 +1,32 @@
 <div class="home-page">
+  <input
+    #fileInput
+    type="file"
+    accept=".db,.sqlite,.sqlite3"
+    class="file-input"
+    (change)="onFileSelected($event)"
+    aria-label="Seleccionar base de datos"
+  />
   @if (!hasDb && !loading()) {
-    <div class="welcome">
-      <input
-        #fileInput
-        type="file"
-        accept=".db,.sqlite,.sqlite3"
-        class="file-input"
-        (change)="onFileSelected($event)"
-        aria-label="Seleccionar base de datos"
-      />
-      <div class="welcome-card">
-        <h1 class="welcome-title">Viewpgd</h1>
-        <p class="welcome-text">Tu catálogo de películas en un solo lugar</p>
-        <p class="welcome-hint">Carga tu archivo SQLite con la vista <code>v_movies_catalog</code> para empezar.</p>
+    <div class="home-load">
+      <div class="home-brand">
+        <img src="assets/icon.png" alt="" class="home-brand-icon" width="64" height="64" />
+        <h1 class="home-title">Viewpgd</h1>
+      </div>
+      <p class="home-tagline">Tu catálogo de películas en un solo lugar</p>
+      <div class="home-card">
+        <p class="home-hint">Necesitas un archivo SQLite con la vista <code>v_movies_catalog</code>.</p>
         @if (error()) {
-          <p class="welcome-error">{{ error() }}</p>
+          <p class="home-error">{{ error() }}</p>
         }
-        <button type="button" class="btn-primary" (click)="fileInput.click()">
-          Cargar base de datos
+        <button type="button" class="home-btn" (click)="fileInput.click()">
+          Elegir archivo .db
         </button>
       </div>
     </div>
   } @else if (loading()) {
-    <div class="loading-state">
+    <div class="home-loading">
+      <img src="assets/icon.png" alt="" class="home-loading-icon" width="40" height="40" />
       <p>Cargando…</p>
     </div>
   }
