@@ -10,6 +10,7 @@
         aria-label="Seleccionar base de datos"
       />
       <div class="no-db-card">
+        <img src="assets/icon.png" alt="" class="app-icon app-icon--large" width="120" height="120" />
         <p class="no-db-text">No hay base de datos cargada.</p>
         <p class="no-db-hint">Carga tu archivo SQLite con la vista <code>v_movies_catalog</code> para ver tus películas.</p>
         <button
@@ -42,6 +43,7 @@
       </button>
     } @else {
       <div class="player-placeholder">
+        <img src="assets/icon.png" alt="" class="app-icon" width="80" height="80" loading="lazy" />
         <span>Elige una película de la lista para verla aquí</span>
       </div>
     }
@@ -88,7 +90,10 @@
       </header>
 
       @if (loading()) {
-        <p class="message">Cargando películas…</p>
+        <div class="message message--loading">
+          <img src="assets/icon.png" alt="" class="app-icon app-icon--small" width="40" height="40" loading="lazy" />
+          <p class="message-text">Cargando películas…</p>
+        </div>
       } @else if (error()) {
         <p class="message error">{{ error() }}</p>
       } @else {
@@ -98,7 +103,7 @@
               <button type="button" class="movie-card" (click)="playHere(movie)">
                 <span class="movie-poster-wrap">
                   @if (movie.poster) {
-                    <img class="movie-poster" [src]="movie.poster" [alt]="movie.title" loading="lazy" />
+                    <img class="movie-poster" [src]="movie.poster" [alt]="movie.title" loading="lazy" (load)="onPosterLoad($event)" />
                   } @else {
                     <span class="movie-poster-placeholder" aria-hidden="true">▶</span>
                   }

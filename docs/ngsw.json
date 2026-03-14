@@ -1,0 +1,81 @@
+{
+  "configVersion": 1,
+  "timestamp": 1773470795547,
+  "index": "/viewpgd/index.html",
+  "assetGroups": [
+    {
+      "name": "app",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "cacheQueryOptions": {
+        "ignoreVary": true
+      },
+      "urls": [
+        "/viewpgd/chunk-UUTQQLSI.js",
+        "/viewpgd/chunk-VPQHHS2I.js",
+        "/viewpgd/favicon.ico",
+        "/viewpgd/index.html",
+        "/viewpgd/main-B2QDOJY7.js",
+        "/viewpgd/manifest.webmanifest",
+        "/viewpgd/styles-FVFTZFUO.css"
+      ],
+      "patterns": []
+    },
+    {
+      "name": "assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "cacheQueryOptions": {
+        "ignoreVary": true
+      },
+      "urls": [
+        "/viewpgd/icons/icon-128x128.png",
+        "/viewpgd/icons/icon-144x144.png",
+        "/viewpgd/icons/icon-152x152.png",
+        "/viewpgd/icons/icon-192x192.png",
+        "/viewpgd/icons/icon-384x384.png",
+        "/viewpgd/icons/icon-512x512.png",
+        "/viewpgd/icons/icon-72x72.png",
+        "/viewpgd/icons/icon-96x96.png"
+      ],
+      "patterns": []
+    }
+  ],
+  "dataGroups": [],
+  "hashTable": {
+    "/viewpgd/chunk-UUTQQLSI.js": "e71ef5ab7b3bbf5f23feadc3013c4edd4e86cd41",
+    "/viewpgd/chunk-VPQHHS2I.js": "1b9680043071d0692f971242ee27ba060f2b239e",
+    "/viewpgd/favicon.ico": "9c39f434fe1261f68c5e3eefdf734630d99c5670",
+    "/viewpgd/icons/icon-128x128.png": "ffdbff2febdac54548be11b059257178d36a0741",
+    "/viewpgd/icons/icon-144x144.png": "7f21db010c4aa9ce772e244e0349079283d4ae73",
+    "/viewpgd/icons/icon-152x152.png": "6b1bd639e4d4f0ca8bf803ccad62c0bc01734adb",
+    "/viewpgd/icons/icon-192x192.png": "ca595c7def416e9f3d583b0a685c3113c95fc1d4",
+    "/viewpgd/icons/icon-384x384.png": "dfa6871ee055619187baf1ede02bbff80299f40b",
+    "/viewpgd/icons/icon-512x512.png": "1168d80441e096b5d4e70a4b1a678447d60017a9",
+    "/viewpgd/icons/icon-72x72.png": "fd1e48e3766111d242ce774483a76746d38ed10f",
+    "/viewpgd/icons/icon-96x96.png": "0f8c795c7a578c9c15f892154d33766aa3e3da7a",
+    "/viewpgd/index.html": "d88ef9cb0d6bf2e8b7cca427e9db7dddea2b72f5",
+    "/viewpgd/main-B2QDOJY7.js": "15cdec7fed9a061a022929760da824e081c5815a",
+    "/viewpgd/manifest.webmanifest": "6247bd7d9b2d6ac2d48bc636bcc96bedc3051946",
+    "/viewpgd/styles-FVFTZFUO.css": "fb6c1de64d301f959cc4e890321e806951576a22"
+  },
+  "navigationUrls": [
+    {
+      "positive": true,
+      "regex": "^\\/.*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*\\.[^/]*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*__[^/]*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*__[^/]*\\/.*$"
+    }
+  ],
+  "navigationRequestStrategy": "performance"
+}
