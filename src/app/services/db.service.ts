@@ -3,6 +3,9 @@ import type { Movie } from '../models/movie';
 
 const DB_PATH = 'assets/scrapgd.db';
 const CATALOG_VIEW = 'v_movies_catalog';
+const INDEXED_DB_NAME = 'ViewpgdStorage';
+const INDEXED_DB_STORE = 'data';
+const PERSISTED_DB_KEY = 'custom-db';
 
 @Injectable({ providedIn: 'root' })
 export class DbService {
@@ -23,15 +26,73 @@ export class DbService {
     return this.initSqlJs;
   }
 
-  /** Usa la base de datos por defecto (assets) en la próxima lectura. */
-  useDefaultDb(): void {
-    this.customDbBuffer = null;
+  private openIndexedDb(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(INDEXED_DB_NAME, 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      request.onupgradeneeded = (e) => {
+        (e.target as IDBOpenDBRequest).result.createObjectStore(INDEXED_DB_STORE, { keyPath: 'key' });
+      };
+    });
   }
 
-  /** Carga una base de datos desde un archivo elegido por el usuario. */
+  /** Guarda el buffer de la BD en IndexedDB (persistencia local). */
+  async savePersistedDb(buffer: ArrayBuffer): Promise<void> {
+    const db = await this.openIndexedDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(INDEXED_DB_STORE, 'readwrite');
+      const store = tx.objectStore(INDEXED_DB_STORE);
+      const request = store.put({ key: PERSISTED_DB_KEY, buffer });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+      tx.oncomplete = () => db.close();
+    });
+  }
+
+  /** Carga la BD guardada desde IndexedDB. Devuelve true si había una guardada. */
+  async loadPersistedDb(): Promise<boolean> {
+    const db = await this.openIndexedDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(INDEXED_DB_STORE, 'readonly');
+      const request = tx.objectStore(INDEXED_DB_STORE).get(PERSISTED_DB_KEY);
+      request.onerror = () => { db.close(); reject(request.error); };
+      request.onsuccess = () => {
+        db.close();
+        const row = request.result as { buffer: ArrayBuffer } | undefined;
+        if (row?.buffer) {
+          this.customDbBuffer = row.buffer;
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      };
+    });
+  }
+
+  /** Borra la BD guardada en IndexedDB. */
+  async clearPersistedDb(): Promise<void> {
+    const db = await this.openIndexedDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(INDEXED_DB_STORE, 'readwrite');
+      const request = tx.objectStore(INDEXED_DB_STORE).delete(PERSISTED_DB_KEY);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+      tx.oncomplete = () => db.close();
+    });
+  }
+
+  /** Usa la base de datos por defecto (assets) en la próxima lectura y borra la guardada. */
+  useDefaultDb(): void {
+    this.customDbBuffer = null;
+    this.clearPersistedDb().catch(() => {});
+  }
+
+  /** Carga una base de datos desde un archivo elegido por el usuario y la guarda en IndexedDB. */
   async loadCustomDb(file: File): Promise<void> {
     const buffer = await file.arrayBuffer();
     this.customDbBuffer = buffer;
+    await this.savePersistedDb(buffer);
   }
 
   /** Lee la vista v_movies_catalog y devuelve los registros como Movie[]. Usa BD por defecto o la cargada por el usuario. */

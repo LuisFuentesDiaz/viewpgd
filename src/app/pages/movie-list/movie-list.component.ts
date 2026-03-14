@@ -37,13 +37,22 @@ export class MovieListComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   ngOnInit(): void {
-    this.hasCustomDb.set(this.db.hasCustomDb());
-    if (this.db.hasCustomDb()) {
-      this.loadMovies();
-    } else {
-      this.loading.set(false);
-    }
     document.addEventListener('fullscreenchange', this.fullscreenChangeHandler);
+    this.db.loadPersistedDb().then((hadPersisted) => {
+      this.hasCustomDb.set(this.db.hasCustomDb());
+      if (this.db.hasCustomDb()) {
+        this.loadMovies();
+      } else {
+        this.loading.set(false);
+      }
+    }).catch(() => {
+      this.hasCustomDb.set(this.db.hasCustomDb());
+      if (this.db.hasCustomDb()) {
+        this.loadMovies();
+      } else {
+        this.loading.set(false);
+      }
+    });
   }
 
   private loadMovies(): void {
