@@ -29,7 +29,6 @@ export class MovieListComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly error = signal<string | null>(null);
   readonly currentVideoUrl = signal<SafeResourceUrl | null>(null);
   readonly listVisible = signal(false);
-  readonly listExpanded = signal(false);
   readonly isFullscreen = signal(false);
   readonly hasCustomDb = signal(false);
 
@@ -74,10 +73,6 @@ export class MovieListComponent implements OnInit, AfterViewInit, OnDestroy {
     this.listVisible.update((v) => !v);
   }
 
-  toggleListExpanded(): void {
-    this.listExpanded.update((v) => !v);
-  }
-
   async toggleFullscreen(): Promise<void> {
     const el = this.playerSectionRef?.nativeElement;
     if (!el) return;
@@ -113,10 +108,18 @@ export class MovieListComponent implements OnInit, AfterViewInit, OnDestroy {
     input.value = '';
   }
 
+  confirmRemoveDb(): void {
+    if (window.confirm('¿Quitar la base de datos cargada? Volverás a la pantalla inicial.')) {
+      this.useDefaultDb();
+    }
+  }
+
   useDefaultDb(): void {
     this.db.useDefaultDb();
     this.hasCustomDb.set(false);
     this.currentVideoUrl.set(null);
-    this.loadMovies();
+    this.movies.set([]);
+    this.loading.set(false);
+    this.error.set(null);
   }
 }

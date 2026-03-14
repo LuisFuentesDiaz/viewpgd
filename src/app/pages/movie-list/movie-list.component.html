@@ -62,48 +62,29 @@
   <div
     class="list-overlay"
     [class.list-overlay--visible]="listVisible()"
-    [class.list-overlay--expanded]="listExpanded()"
     aria-label="Lista de películas"
     [attr.aria-hidden]="!listVisible()"
   >
     <section class="list-section">
       <header class="header">
-        <h1>Películas</h1>
-        <div class="header-actions">
-          <input
-            #fileInput
-            type="file"
-            accept=".db,.sqlite,.sqlite3"
-            class="file-input"
-            (change)="onFileSelected($event)"
-            aria-label="Seleccionar base de datos"
-          />
-          <button
-            type="button"
-            class="btn-load-db"
-            (click)="fileInput.click()"
-            aria-label="Cargar mi base de datos"
-          >
-            Cargar BD
-          </button>
-          @if (hasCustomDb()) {
-            <button type="button" class="btn-default-db" (click)="useDefaultDb()" aria-label="Usar base por defecto">
-              Por defecto
-            </button>
-          }
-          <button
-            type="button"
-            class="btn-expand"
-            (click)="toggleListExpanded()"
-            [attr.aria-label]="listExpanded() ? 'Reducir lista' : 'Expandir lista hasta arriba'"
-            [title]="listExpanded() ? 'Reducir' : 'Expandir'"
-          >
-            {{ listExpanded() ? '▾' : '▴' }}
-          </button>
-          <button type="button" class="btn-hide" (click)="toggleList()" aria-label="Ocultar lista">
-            Ocultar
+        <div class="header-row">
+          <h1 class="header-title">Listado de películas</h1>
+          <button type="button" class="btn-hide" (click)="toggleList()" aria-label="Ocultar lista" title="Ocultar">
+            <span aria-hidden="true">▼</span>
           </button>
         </div>
+        @if (hasCustomDb()) {
+          <div class="header-below">
+            <button
+              type="button"
+              class="link-remove-db"
+              (click)="confirmRemoveDb()"
+              aria-label="Quitar base de datos"
+            >
+              Quitar BD
+            </button>
+          </div>
+        }
       </header>
 
       @if (loading()) {
