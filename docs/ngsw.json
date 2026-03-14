@@ -1,6 +1,6 @@
 {
   "configVersion": 1,
-  "timestamp": 1773470795547,
+  "timestamp": 1773472046966,
   "index": "/viewpgd/index.html",
   "assetGroups": [
     {
@@ -15,7 +15,7 @@
         "/viewpgd/chunk-VPQHHS2I.js",
         "/viewpgd/favicon.ico",
         "/viewpgd/index.html",
-        "/viewpgd/main-B2QDOJY7.js",
+        "/viewpgd/main-E6QZBMRP.js",
         "/viewpgd/manifest.webmanifest",
         "/viewpgd/styles-FVFTZFUO.css"
       ],
@@ -29,6 +29,7 @@
         "ignoreVary": true
       },
       "urls": [
+        "/viewpgd/assets/icon.png",
         "/viewpgd/icons/icon-128x128.png",
         "/viewpgd/icons/icon-144x144.png",
         "/viewpgd/icons/icon-152x152.png",
@@ -43,9 +44,10 @@
   ],
   "dataGroups": [],
   "hashTable": {
+    "/viewpgd/assets/icon.png": "ca595c7def416e9f3d583b0a685c3113c95fc1d4",
     "/viewpgd/chunk-UUTQQLSI.js": "e71ef5ab7b3bbf5f23feadc3013c4edd4e86cd41",
     "/viewpgd/chunk-VPQHHS2I.js": "1b9680043071d0692f971242ee27ba060f2b239e",
-    "/viewpgd/favicon.ico": "9c39f434fe1261f68c5e3eefdf734630d99c5670",
+    "/viewpgd/favicon.ico": "16887f769e31786141f7fc7b5a6776028a7f2223",
     "/viewpgd/icons/icon-128x128.png": "ffdbff2febdac54548be11b059257178d36a0741",
     "/viewpgd/icons/icon-144x144.png": "7f21db010c4aa9ce772e244e0349079283d4ae73",
     "/viewpgd/icons/icon-152x152.png": "6b1bd639e4d4f0ca8bf803ccad62c0bc01734adb",
@@ -54,9 +56,9 @@
     "/viewpgd/icons/icon-512x512.png": "1168d80441e096b5d4e70a4b1a678447d60017a9",
     "/viewpgd/icons/icon-72x72.png": "fd1e48e3766111d242ce774483a76746d38ed10f",
     "/viewpgd/icons/icon-96x96.png": "0f8c795c7a578c9c15f892154d33766aa3e3da7a",
-    "/viewpgd/index.html": "d88ef9cb0d6bf2e8b7cca427e9db7dddea2b72f5",
-    "/viewpgd/main-B2QDOJY7.js": "15cdec7fed9a061a022929760da824e081c5815a",
-    "/viewpgd/manifest.webmanifest": "6247bd7d9b2d6ac2d48bc636bcc96bedc3051946",
+    "/viewpgd/index.html": "855aa0b2b577948fddae149ed31b335f6237c417",
+    "/viewpgd/main-E6QZBMRP.js": "d52fca4d2da5b60e76f32c72bfb63d0f908d77b0",
+    "/viewpgd/manifest.webmanifest": "b2453954222bd44f1719ff6de35b6833b8a79e31",
     "/viewpgd/styles-FVFTZFUO.css": "fb6c1de64d301f959cc4e890321e806951576a22"
   },
   "navigationUrls": [
