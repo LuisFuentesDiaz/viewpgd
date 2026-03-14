@@ -1,0 +1,12 @@
+<div class="player-page">
+  @if (videoUrl(); as url) {
+    <iframe
+    width="100%"
+    height="500"
+    [src]="url"
+    allow="autoplay"
+  ></iframe>
+  } @else {
+    <p class="no-video">No se ha seleccionado ningún video. Cierra esta ventana y elige una película en la lista.</p>
+  }
+</div>

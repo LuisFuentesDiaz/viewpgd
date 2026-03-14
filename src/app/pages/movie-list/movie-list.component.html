@@ -1,0 +1,135 @@
+<div class="list-page">
+  @if (!hasCustomDb() && movies().length === 0 && !loading()) {
+    <div class="no-db-state">
+      <input
+        #fileInputWelcome
+        type="file"
+        accept=".db,.sqlite,.sqlite3"
+        class="file-input"
+        (change)="onFileSelected($event)"
+        aria-label="Seleccionar base de datos"
+      />
+      <div class="no-db-card">
+        <p class="no-db-text">No hay base de datos cargada.</p>
+        <p class="no-db-hint">Carga tu archivo SQLite con la vista <code>v_movies_catalog</code> para ver tus películas.</p>
+        <button
+          type="button"
+          class="btn-load-db-center"
+          (click)="fileInputWelcome.click()"
+        >
+          Cargar base de datos
+        </button>
+      </div>
+    </div>
+  } @else {
+  <section #playerSection class="player-section" aria-label="Reproductor">
+    @if (currentVideoUrl(); as url) {
+      <iframe
+        class="player-iframe"
+        [src]="url"
+        title="Reproductor de película"
+        allow="fullscreen; autoplay; picture-in-picture"
+        allowfullscreen
+      ></iframe>
+      <button
+        type="button"
+        class="btn-fullscreen"
+        (click)="toggleFullscreen()"
+        [attr.aria-label]="isFullscreen() ? 'Salir de pantalla completa' : 'Pantalla completa'"
+        [title]="isFullscreen() ? 'Salir de pantalla completa' : 'Pantalla completa'"
+      >
+        {{ isFullscreen() ? '✕' : '⛶' }}
+      </button>
+    } @else {
+      <div class="player-placeholder">
+        <span>Elige una película de la lista para verla aquí</span>
+      </div>
+    }
+  </section>
+
+  <button
+    type="button"
+    class="list-tab"
+    [class.list-tab--hidden]="listVisible()"
+    (click)="toggleList()"
+    [attr.aria-expanded]="listVisible()"
+    aria-label="{{ listVisible() ? 'Ocultar lista' : 'Ver lista de películas' }}"
+  >
+    <span class="list-tab-text">{{ listVisible() ? 'Ocultar lista' : 'Películas' }}</span>
+    <span class="list-tab-icon" aria-hidden="true">{{ listVisible() ? '▼' : '▲' }}</span>
+  </button>
+
+  <div
+    class="list-overlay"
+    [class.list-overlay--visible]="listVisible()"
+    [class.list-overlay--expanded]="listExpanded()"
+    aria-label="Lista de películas"
+    [attr.aria-hidden]="!listVisible()"
+  >
+    <section class="list-section">
+      <header class="header">
+        <h1>Películas</h1>
+        <div class="header-actions">
+          <input
+            #fileInput
+            type="file"
+            accept=".db,.sqlite,.sqlite3"
+            class="file-input"
+            (change)="onFileSelected($event)"
+            aria-label="Seleccionar base de datos"
+          />
+          <button
+            type="button"
+            class="btn-load-db"
+            (click)="fileInput.click()"
+            aria-label="Cargar mi base de datos"
+          >
+            Cargar BD
+          </button>
+          @if (hasCustomDb()) {
+            <button type="button" class="btn-default-db" (click)="useDefaultDb()" aria-label="Usar base por defecto">
+              Por defecto
+            </button>
+          }
+          <button
+            type="button"
+            class="btn-expand"
+            (click)="toggleListExpanded()"
+            [attr.aria-label]="listExpanded() ? 'Reducir lista' : 'Expandir lista hasta arriba'"
+            [title]="listExpanded() ? 'Reducir' : 'Expandir'"
+          >
+            {{ listExpanded() ? '▾' : '▴' }}
+          </button>
+          <button type="button" class="btn-hide" (click)="toggleList()" aria-label="Ocultar lista">
+            Ocultar
+          </button>
+        </div>
+      </header>
+
+      @if (loading()) {
+        <p class="message">Cargando películas…</p>
+      } @else if (error()) {
+        <p class="message error">{{ error() }}</p>
+      } @else {
+        <ul class="movie-grid">
+          @for (movie of movies(); track movie.id) {
+            <li>
+              <button type="button" class="movie-card" (click)="playHere(movie)">
+                <span class="movie-poster-wrap">
+                  @if (movie.poster) {
+                    <img class="movie-poster" [src]="movie.poster" [alt]="movie.title" loading="lazy" />
+                  } @else {
+                    <span class="movie-poster-placeholder" aria-hidden="true">▶</span>
+                  }
+                </span>
+                <span class="movie-title" [title]="movie.title">{{ movie.title }}</span>
+                <span class="movie-year">{{ movie.year }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+  }
+</div>
