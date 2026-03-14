@@ -70,7 +70,12 @@
     <section class="list-section">
       <header class="header">
         <div class="header-row">
-          <h1 class="header-title">Listado de películas</h1>
+          <h1 class="header-title">
+          Listado de películas
+          @if (!loading() && !error()) {
+            <span class="header-count" aria-label="{{ movies().length }} películas">{{ movies().length }}</span>
+          }
+        </h1>
           <button type="button" class="btn-hide" (click)="toggleList()" aria-label="Ocultar lista" title="Ocultar">
             <span aria-hidden="true">▼</span>
           </button>
