@@ -189,7 +189,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  max-height: 75vh;
+  max-height: 85vh;
   z-index: 10;
   background: linear-gradient(180deg, rgba(15, 15, 18, 0.97) 0%, rgba(26, 26, 34, 0.98) 100%);
   backdrop-filter: blur(12px);
@@ -200,6 +200,16 @@
   flex-direction: column;
   transform: translateY(100%);
   transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (min-width: 768px) {
+  .list-overlay {
+    max-width: 70%;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+  }
 }
 .list-overlay.list-overlay--visible {
   transform: translateY(0);
@@ -430,4 +440,34 @@
   padding: 0 0.6rem 0.6rem;
   font-size: 0.8rem;
   color: #8e8e93;
+}
+
+/* Móvil: tarjetas más pequeñas, 3 en fila */
+@media (max-width: 767px) {
+  .movie-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .movie-card {
+    border-radius: 8px;
+  }
+
+  .movie-poster-placeholder {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+
+  .movie-card .movie-title {
+    padding: 0.35rem 0.4rem 0.15rem;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    -webkit-line-clamp: 2;
+  }
+
+  .movie-card .movie-year {
+    padding: 0 0.4rem 0.4rem;
+    font-size: 0.65rem;
+  }
 }
