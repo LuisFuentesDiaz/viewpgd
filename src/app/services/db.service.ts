@@ -4,6 +4,11 @@ import type { Movie } from '../models/movie';
 
 const DB_PATH = 'assets/scrapgd.db';
 const CATALOG_VIEW = 'v_movies_catalog';
+
+interface SqlDbResultRow {
+  columns: string[];
+  values: (string | number | null)[][];
+}
 const INDEXED_DB_NAME = 'ViewpgdStorage';
 const INDEXED_DB_STORE = 'data';
 const PERSISTED_DB_KEY = 'custom-db';
@@ -98,8 +103,58 @@ export class DbService {
     await this.savePersistedDb(buffer);
   }
 
-  /** Lee la vista v_movies_catalog y devuelve los registros como Movie[]. Usa BD por defecto o la cargada por el usuario. */
-  async getMovies(): Promise<Movie[]> {
+  /** Devuelve el total de películas (una por name+year), opcionalmente filtradas por nombre. */
+  async getMoviesCount(search?: string): Promise<number> {
+    const db = await this.openDb();
+    try {
+      const where = search?.trim()
+        ? ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`
+        : '';
+      const result = db.exec(
+        `SELECT COUNT(*) AS n FROM (SELECT name, year FROM ${CATALOG_VIEW}${where} GROUP BY name, year)`
+      );
+      db.close();
+      if (!result.length || !result[0].values.length) return 0;
+      return Number(result[0].values[0][0] ?? 0);
+    } catch {
+      db.close();
+      throw new Error('Error al contar películas');
+    }
+  }
+
+  /** Devuelve una página de películas (una por name+year, un solo link). Opcional filtro por nombre. */
+  async getMoviesPage(offset: number, limit: number, search?: string): Promise<Movie[]> {
+    const db = await this.openDb();
+    try {
+      const where = search?.trim()
+        ? ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`
+        : '';
+      const result = db.exec(
+        `SELECT * FROM (
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
+          FROM ${CATALOG_VIEW}${where}
+        ) t WHERE rn = 1 ORDER BY year DESC LIMIT ${Math.max(0, limit)} OFFSET ${Math.max(0, offset)}`
+      );
+      db.close();
+      if (!result.length || !result[0].values.length) return [];
+      const { columns, values } = result[0];
+      const colIdx = columns.indexOf('rn');
+      const cols = colIdx >= 0 ? columns.filter((_, i) => i !== colIdx) : columns;
+      return values.map((row: (string | number | null)[], index: number) => {
+        const r = colIdx >= 0 ? row.filter((_, i) => i !== colIdx) : row;
+        return this.rowToMovie(cols, r, offset + index);
+      });
+    } catch {
+      db.close();
+      throw new Error('Error al cargar películas');
+    }
+  }
+
+  private escapeSql(s: string): string {
+    return s.replace(/\\/g, '\\\\').replace(/'/g, "''");
+  }
+
+  private async openDb(): Promise<{ exec: (sql: string) => SqlDbResultRow[]; close: () => void }> {
     const initSqlJs = await this.loadSqlJs();
     const baseRaw = this.baseHref ?? '/';
     const base = baseRaw.endsWith('/') ? baseRaw : baseRaw + '/';
@@ -107,7 +162,6 @@ export class DbService {
     const SQL = await initSqlJs({
       locateFile: (file: string) => `${baseUrl}${file}`,
     });
-
     let buffer: ArrayBuffer;
     if (this.customDbBuffer) {
       buffer = this.customDbBuffer;
@@ -116,17 +170,32 @@ export class DbService {
       if (!response.ok) throw new Error(`No se pudo cargar la base de datos: ${response.status}`);
       buffer = await response.arrayBuffer();
     }
+    return new SQL.Database(new Uint8Array(buffer));
+  }
 
-    const db = new SQL.Database(new Uint8Array(buffer));
-    const result = db.exec(`SELECT * FROM ${CATALOG_VIEW}`);
-    db.close();
-
-    if (!result.length || !result[0].values.length) return [];
-
-    const { columns, values } = result[0];
-    return values.map((row: (string | number | null)[], index: number) =>
-      this.rowToMovie(columns, row, index)
-    );
+  /** Lee la vista v_movies_catalog; una fila por película (name+year), un solo link. */
+  async getMovies(): Promise<Movie[]> {
+    const db = await this.openDb();
+    try {
+      const result = db.exec(
+        `SELECT * FROM (
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
+          FROM ${CATALOG_VIEW}
+        ) t WHERE rn = 1 ORDER BY year DESC`
+      );
+      db.close();
+      if (!result.length || !result[0].values.length) return [];
+      const { columns, values } = result[0];
+      const colIdx = columns.indexOf('rn');
+      const cols = colIdx >= 0 ? columns.filter((_, i) => i !== colIdx) : columns;
+      return values.map((row: (string | number | null)[], index: number) => {
+        const r = colIdx >= 0 ? row.filter((_, i) => i !== colIdx) : row;
+        return this.rowToMovie(cols, r, index);
+      });
+    } catch {
+      db.close();
+      throw new Error('Error al cargar películas');
+    }
   }
 
   /** Mapea una fila de v_movies_catalog (name, year, quality, url, fuente, preview) a Movie. */

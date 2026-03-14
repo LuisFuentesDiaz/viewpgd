@@ -73,7 +73,7 @@
           <h1 class="header-title">
           Listado de películas
           @if (!loading() && !error()) {
-            <span class="header-count" aria-label="{{ movies().length }} películas">{{ movies().length }}</span>
+            <span class="header-count" [attr.aria-label]="totalCount() !== null ? movies().length + ' de ' + totalCount() + ' películas' : movies().length + ' películas'">{{ movies().length }}{{ totalCount() !== null ? ' de ' + totalCount() : '' }}</span>
           }
         </h1>
           <button type="button" class="btn-hide" (click)="toggleList()" aria-label="Ocultar lista" title="Ocultar">
@@ -92,6 +92,18 @@
             </button>
           </div>
         }
+        @if (!loading() && !error()) {
+          <div class="filter-wrap">
+            <input
+              type="search"
+              class="filter-input"
+              [value]="filterQuery()"
+              (input)="onFilterInput($any($event.target).value)"
+              placeholder="Filtrar por nombre…"
+              aria-label="Filtrar películas por nombre"
+            />
+          </div>
+        }
       </header>
 
       @if (loading()) {
@@ -102,7 +114,7 @@
       } @else if (error()) {
         <p class="message error">{{ error() }}</p>
       } @else {
-        <ul class="movie-grid">
+        <ul #movieGrid class="movie-grid">
           @for (movie of movies(); track movie.id) {
             <li>
               <button type="button" class="movie-card" (click)="playHere(movie)">
@@ -118,7 +130,13 @@
               </button>
             </li>
           }
+          <li class="sentinel-li" aria-hidden="true">
+            <div #loadMoreSentinel class="load-more-sentinel"></div>
+          </li>
         </ul>
+        @if (loadingMore()) {
+          <p class="message message--loading-more">Cargando más…</p>
+        }
       }
     </section>
   </div>
