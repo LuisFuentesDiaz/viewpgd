@@ -18,7 +18,10 @@
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
-            "outputPath": "docs",
+            "outputPath": {
+              "base": "docs",
+              "browser": ""
+            },
             "assets": [
               {
                 "glob": "**/*",
@@ -34,6 +37,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/viewpgd/",
               "budgets": [
                 {
                   "type": "initial",
