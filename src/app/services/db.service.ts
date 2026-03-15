@@ -3,6 +3,7 @@ import { Inject, Injectable, Optional } from '@angular/core';
 import type { Movie } from '../models/movie';
 
 const DB_PATH = 'assets/scrapgd.db';
+/** v_movies_catalog: name, year, quality, url_poster, preview. Para "Más recientes": upload_date (TEXT, formato YYYY-MM-DD HH:MM:SS). */
 const CATALOG_VIEW = 'v_movies_catalog';
 
 interface SqlDbResultRow {
@@ -138,12 +139,12 @@ export class DbService {
     }
   }
 
-  /** orderBy: 'year' | 'name', order: 'asc' | 'desc'. Opcional year para filtrar por año. */
+  /** orderBy: 'year' | 'name' | 'upload_date', order: 'asc' | 'desc'. Opcional year para filtrar por año. */
   async getMoviesPage(
     offset: number,
     limit: number,
     search?: string,
-    orderBy: 'year' | 'name' = 'year',
+    orderBy: 'year' | 'name' | 'upload_date' = 'year',
     order: 'asc' | 'desc' = 'desc',
     year?: number
   ): Promise<Movie[]> {
@@ -152,7 +153,7 @@ export class DbService {
       let where = '';
       if (search?.trim()) where += ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
       if (year != null && !Number.isNaN(year)) where += (where ? ' AND ' : ' WHERE ') + ` year = ${year}`;
-      const ob = orderBy === 'name' ? 'name' : 'year';
+      const ob = orderBy === 'name' ? 'name' : orderBy === 'upload_date' ? 'upload_date' : 'year';
       const dir = order === 'asc' ? 'ASC' : 'DESC';
       const result = db.exec(
         `SELECT * FROM (
@@ -198,30 +199,6 @@ export class DbService {
     return new SQL.Database(new Uint8Array(buffer));
   }
 
-  /** Devuelve una película aleatoria del catálogo (una por name+year). */
-  async getRandomMovie(): Promise<Movie | null> {
-    const db = await this.openDb();
-    try {
-      const result = db.exec(
-        `SELECT * FROM (
-          SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
-          FROM ${CATALOG_VIEW}
-        ) t WHERE rn = 1 ORDER BY RANDOM() LIMIT 1`
-      );
-      db.close();
-      if (!result.length || !result[0].values.length) return null;
-      const { columns, values } = result[0];
-      const colIdx = columns.indexOf('rn');
-      const cols = colIdx >= 0 ? columns.filter((_, i) => i !== colIdx) : columns;
-      const row = values[0] as (string | number | null)[];
-      const r = colIdx >= 0 ? row.filter((_, i) => i !== colIdx) : row;
-      return this.rowToMovie(cols, r, 0);
-    } catch {
-      db.close();
-      return null;
-    }
-  }
-
   /** Lee la vista v_movies_catalog; una fila por película (name+year), un solo link. */
   async getMovies(): Promise<Movie[]> {
     const db = await this.openDb();
@@ -247,7 +224,7 @@ export class DbService {
     }
   }
 
-  /** Mapea una fila de v_movies_catalog (name, year, quality, url, fuente, preview) a Movie. */
+  /** Mapea una fila de v_movies_catalog (name, year, quality, url_poster, url, source, preview; opcional id, upload_date) a Movie. */
   private rowToMovie(
     columns: string[],
     row: (string | number | null)[],
@@ -260,11 +237,11 @@ export class DbService {
     const name = String(raw['name'] ?? '');
     const year = Number(raw['year'] ?? 0);
     return {
-      id: String(raw['id'] ?? `movie-${index}`),
+      id: raw['id'] != null ? String(raw['id']) : `movie-${index}`,
       title: name,
       year,
       quality: String(raw['quality'] ?? ''),
-      poster: raw['poster_url'] != null ? String(raw['poster_url']) : raw['poster'] != null ? String(raw['poster']) : undefined,
+      poster: raw['url_poster'] != null ? String(raw['url_poster']) : undefined,
       videoUrl: String(raw['preview'] ?? ''),
     };
   }

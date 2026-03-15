@@ -17,7 +17,7 @@ import { UserDataService } from '../../services/user-data.service';
 const PAGE_SIZE = 30;
 const CAROUSEL_SIZE = 15;
 const MAX_CAROUSEL_YEARS = 5;
-type OrderBy = 'year' | 'name';
+type OrderBy = 'year' | 'name' | 'upload_date';
 type Order = 'asc' | 'desc';
 
 export interface YearCarousel {
@@ -42,12 +42,13 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly movies = signal<Movie[]>([]);
   readonly filterQuery = signal('');
-  readonly orderBy = signal<OrderBy>('year');
+  readonly orderBy = signal<OrderBy>('upload_date');
   readonly order = signal<Order>('desc');
   readonly favoritesOnly = signal(false);
   readonly viewMode = signal<'grid' | 'list'>('grid');
   readonly showFullCatalog = signal(false);
   readonly navVisible = signal(true);
+  readonly recentMovies = signal<Movie[]>([]);
   readonly carousels = signal<YearCarousel[]>([]);
   readonly carouselsLoading = signal(true);
   readonly loading = signal(true);
@@ -81,17 +82,28 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private loadCarousels(): void {
     this.carouselsLoading.set(true);
-    this.db.getYears().then((years) => {
+    const loadRecent = this.db
+      .getMoviesPage(0, CAROUSEL_SIZE, undefined, 'upload_date', 'desc')
+      .catch(() => this.db.getMoviesPage(0, CAROUSEL_SIZE, undefined, 'year', 'desc'));
+    const loadByYear = this.db.getYears().then((years) => {
       const limited = years.slice(0, MAX_CAROUSEL_YEARS);
-      Promise.all(
+      return Promise.all(
         limited.map((year) =>
           this.db.getMoviesPage(0, CAROUSEL_SIZE, undefined, 'year', 'desc', year).then((movies) => ({ year, movies }))
         )
-      ).then((rows) => {
+      );
+    });
+    Promise.all([loadRecent, loadByYear])
+      .then(([recentList, rows]) => {
+        this.recentMovies.set(recentList);
         this.carousels.set(rows.filter((r) => r.movies.length > 0));
         this.carouselsLoading.set(false);
+      })
+      .catch(() => {
+        this.recentMovies.set([]);
+        this.carousels.set([]);
+        this.carouselsLoading.set(false);
       });
-    }).catch(() => this.carouselsLoading.set(false));
   }
 
   showFullCatalogView(): void {
@@ -146,7 +158,11 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.filterDebounceTimer != null) clearTimeout(this.filterDebounceTimer);
     this.filterDebounceTimer = setTimeout(() => {
       this.filterDebounceTimer = null;
-      this.loadFirstPage();
+      if (this.showFullCatalog()) {
+        this.loadFirstPage();
+      } else {
+        this.showFullCatalogView();
+      }
     }, 400);
   }
 
@@ -217,15 +233,6 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!last?.videoUrl) return;
     this.router.navigate(['/player'], {
       queryParams: { video: last.videoUrl, title: encodeURIComponent(last.title) },
-    });
-  }
-
-  async playRandom(): Promise<void> {
-    const movie = await this.db.getRandomMovie();
-    if (!movie?.videoUrl) return;
-    this.userData.setLastWatched(movie);
-    this.router.navigate(['/player'], {
-      queryParams: { video: movie.videoUrl, title: encodeURIComponent(movie.title) },
     });
   }
 

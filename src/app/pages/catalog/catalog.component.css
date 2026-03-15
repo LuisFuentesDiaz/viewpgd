@@ -82,9 +82,56 @@
   opacity: 0.8;
 }
 
-.nav-spacer {
+/* Buscador integrado en la barra (estilo pill) */
+.nav-search-wrap {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem 0.35rem 0.9rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 2rem;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-search-wrap:focus-within {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.nav-search-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--vp-text-muted);
+  opacity: 0.85;
+}
+
+.nav-search-wrap:focus-within .nav-search-icon {
+  color: var(--vp-text);
+  opacity: 1;
+}
+
+.nav-search {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--vp-text);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.nav-search::placeholder {
+  color: var(--vp-text-muted);
+}
+
+.nav-search:focus {
+  outline: none;
 }
 
 .nav-actions {
@@ -157,14 +204,30 @@
 
   .nav-row {
     min-height: 3.5rem;
+    gap: 0.5rem;
+  }
+
+  .nav-search-wrap {
+    min-height: 2.35rem;
+    padding: 0.35rem 0.6rem 0.35rem 0.75rem;
+  }
+
+  .nav-search-icon {
+    font-size: 0.9rem;
+  }
+
+  .nav-search {
+    font-size: 1rem; /* 16px evita zoom al enfocar en iOS */
   }
 
   .nav-brand {
     font-size: 1rem;
+    flex-shrink: 0;
   }
 
   .nav-actions {
     gap: 0;
+    flex-shrink: 0;
   }
 
   .nav-item {
@@ -219,13 +282,6 @@
     margin-bottom: 1rem;
   }
 
-  .toolbar .filter-input {
-    order: -1;
-    width: 100%;
-    min-width: 0;
-    min-height: 2.75rem;
-  }
-
   .select-sort,
   .btn-toggle {
     min-height: 2.75rem;
@@ -234,6 +290,13 @@
   .movie-list {
     max-height: none;
     padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+  }
+}
+
+/* Pantallas muy estrechas: más espacio para el buscador */
+@media (max-width: 380px) {
+  .nav-brand span {
+    display: none;
   }
 }
 

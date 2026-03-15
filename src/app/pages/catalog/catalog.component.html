@@ -13,14 +13,23 @@
               <span>Viewpgd</span>
             </a>
           }
-        <div class="nav-spacer"></div>
+        <div class="nav-search-wrap">
+          <span class="nav-search-icon" aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            class="nav-search"
+            [value]="filterQuery()"
+            (input)="onFilterInput($any($event.target).value)"
+            placeholder="Buscar películas"
+            aria-label="Buscar películas"
+          />
+        </div>
         <nav class="nav-actions">
           @if (showFullCatalog()) {
             @if (!loading() && !error()) {
               <span class="nav-count">{{ displayedMovies().length }}{{ totalCount() !== null ? ' de ' + totalCount() : '' }}</span>
             }
           }
-          <button type="button" class="nav-item" (click)="playRandom()">Aleatoria</button>
           @if (!showFullCatalog()) {
             <button type="button" class="nav-item nav-item--muted" (click)="confirmRemoveDb()">Quitar BD</button>
           }
@@ -34,6 +43,8 @@
             (change)="onOrderChange($event)"
             aria-label="Ordenar por"
           >
+            <option value="upload_date-desc">Más recientes</option>
+            <option value="upload_date-asc">Fecha de subida (más antigua)</option>
             <option value="year-desc">Año (más reciente)</option>
             <option value="year-asc">Año (más antiguo)</option>
             <option value="name-asc">Nombre (A-Z)</option>
@@ -58,14 +69,6 @@
           >
             {{ viewMode() === 'grid' ? '☷' : '⊞' }}
           </button>
-          <input
-            type="search"
-            class="filter-input"
-            [value]="filterQuery()"
-            (input)="onFilterInput($any($event.target).value)"
-            placeholder="Buscar…"
-            aria-label="Buscar películas"
-          />
         </div>
       }
     </header>
@@ -90,6 +93,44 @@
               <span class="continue-title">{{ last.title }}</span>
               <span class="continue-year">{{ last.year }}</span>
             </button>
+          </div>
+        </section>
+      }
+
+      @if (recentMovies().length > 0) {
+        <section class="carousel-section" aria-label="Películas más recientes">
+          <h2 class="section-title">Más recientes</h2>
+          <div class="carousel-row">
+            @for (movie of recentMovies(); track movie.id) {
+              <article class="movie-card movie-card--carousel" (click)="playMovie(movie)">
+                <div class="movie-poster-wrap">
+                  @if (movie.poster) {
+                    <img
+                      class="movie-poster"
+                      [src]="movie.poster"
+                      [alt]="movie.title"
+                      loading="lazy"
+                      (load)="onPosterLoad($event)"
+                    />
+                  } @else {
+                    <span class="movie-poster-placeholder">▶</span>
+                  }
+                  <span class="play-overlay" aria-hidden="true"><span class="play-icon">▶</span></span>
+                  <button
+                    type="button"
+                    class="btn-fav"
+                    [class.btn-fav--on]="isFavorite(movie.id)"
+                    (click)="toggleFavorite($event, movie.id)"
+                    [attr.aria-label]="isFavorite(movie.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
+                  >
+                    ♥
+                  </button>
+                </div>
+                <div class="movie-info">
+                  <h3 class="movie-title" [title]="movie.title">{{ movie.title }}</h3>
+                </div>
+              </article>
+            }
           </div>
         </section>
       }
