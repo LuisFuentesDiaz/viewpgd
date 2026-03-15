@@ -241,4 +241,22 @@
     }
   }
   </main>
+
+  @if (linkPickerMovie(); as movie) {
+    <div class="link-picker-backdrop" (click)="closeLinkPicker()" role="presentation"></div>
+    <div class="link-picker-modal" role="dialog" aria-labelledby="link-picker-title" aria-modal="true">
+      <h2 id="link-picker-title" class="link-picker-title">Elegir enlace</h2>
+      <p class="link-picker-subtitle">{{ movie.title }}</p>
+      <ul class="link-picker-list">
+        @for (url of linkPickerOptions(); track url; let i = $index) {
+          <li>
+            <button type="button" class="link-picker-btn" (click)="navigateToPlayer(movie, url)">
+              Enlace {{ i + 1 }}
+            </button>
+          </li>
+        }
+      </ul>
+      <button type="button" class="link-picker-cancel" (click)="closeLinkPicker()">Cancelar</button>
+    </div>
+  }
 </div>

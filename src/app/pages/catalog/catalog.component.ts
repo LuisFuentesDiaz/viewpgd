@@ -56,6 +56,8 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly hasMore = signal(true);
   readonly totalCount = signal<number | null>(null);
   readonly error = signal<string | null>(null);
+  readonly linkPickerMovie = signal<Movie | null>(null);
+  readonly linkPickerOptions = signal<string[]>([]);
 
   readonly favoritesSet = this.userData.favorites;
 
@@ -249,10 +251,28 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   playMovie(movie: Movie): void {
-    this.userData.setLastWatched(movie);
-    this.router.navigate(['/player'], {
-      queryParams: { video: movie.videoUrl, title: encodeURIComponent(movie.title) },
+    this.db.getPreviewOptionsForMovie(movie.title, movie.year).then((options) => {
+      if (options.length === 0) return;
+      if (options.length === 1) {
+        this.navigateToPlayer(movie, options[0]);
+        return;
+      }
+      this.linkPickerMovie.set(movie);
+      this.linkPickerOptions.set(options);
     });
+  }
+
+  navigateToPlayer(movie: Movie, previewUrl: string): void {
+    this.closeLinkPicker();
+    this.userData.setLastWatched({ ...movie, videoUrl: previewUrl });
+    this.router.navigate(['/player'], {
+      queryParams: { video: previewUrl, title: encodeURIComponent(movie.title) },
+    });
+  }
+
+  closeLinkPicker(): void {
+    this.linkPickerMovie.set(null);
+    this.linkPickerOptions.set([]);
   }
 
   onListScroll(e: Event): void {

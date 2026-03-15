@@ -176,6 +176,26 @@ export class DbService {
     }
   }
 
+  /** Devuelve todos los preview (GD) para una película por nombre y año. */
+  async getPreviewOptionsForMovie(name: string, year: number | string): Promise<string[]> {
+    const db = await this.openDb();
+    try {
+      const yearVal = typeof year === 'string' ? year : String(year);
+      const result = db.exec(
+        `SELECT preview FROM ${CATALOG_VIEW} WHERE name = '${this.escapeSql(name)}' AND year = '${this.escapeSql(yearVal)}'`
+      );
+      db.close();
+      if (!result.length || !result[0].values.length) return [];
+      return result[0].values
+        .map((row) => row[0])
+        .filter((v): v is string => v != null && v !== '')
+        .map(String);
+    } catch {
+      db.close();
+      return [];
+    }
+  }
+
   private escapeSql(s: string): string {
     return s.replace(/\\/g, '\\\\').replace(/'/g, "''");
   }
