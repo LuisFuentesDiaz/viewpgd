@@ -259,4 +259,24 @@
       <button type="button" class="link-picker-cancel" (click)="closeLinkPicker()">Cancelar</button>
     </div>
   }
+
+  @if (playerOverlaySrc(); as url) {
+    <div class="player-overlay">
+      <header class="player-overlay-header">
+        <button type="button" class="player-overlay-back" (click)="closePlayerOverlay()" aria-label="Volver">
+          ← Volver
+        </button>
+        <h1 class="player-overlay-title">{{ playerOverlayTitle() }}</h1>
+      </header>
+      <div class="player-overlay-video-wrap">
+        <iframe
+          class="player-overlay-video"
+          [src]="url"
+          title="Reproductor"
+          allow="fullscreen; autoplay; picture-in-picture"
+          allowfullscreen
+        ></iframe>
+      </div>
+    </div>
+  }
 </div>

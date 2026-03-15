@@ -10,6 +10,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import type { Movie } from '../../models/movie';
 import { DbService } from '../../services/db.service';
 import { UserDataService } from '../../services/user-data.service';
@@ -36,6 +37,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   private db = inject(DbService);
   private userData = inject(UserDataService);
   private router = inject(Router);
+  private sanitizer = inject(DomSanitizer);
 
   @ViewChild('movieGrid') movieGridRef?: ElementRef<HTMLUListElement>;
   @ViewChild('loadMoreSentinel') sentinelRef?: ElementRef<HTMLElement>;
@@ -58,6 +60,8 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly error = signal<string | null>(null);
   readonly linkPickerMovie = signal<Movie | null>(null);
   readonly linkPickerOptions = signal<string[]>([]);
+  readonly playerOverlaySrc = signal<SafeResourceUrl | null>(null);
+  readonly playerOverlayTitle = signal<string>('');
 
   readonly favoritesSet = this.userData.favorites;
 
@@ -233,9 +237,8 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   continueWatching(): void {
     const last = this.userData.lastWatchedMovie();
     if (!last?.videoUrl) return;
-    this.router.navigate(['/player'], {
-      queryParams: { video: last.videoUrl, title: encodeURIComponent(last.title) },
-    });
+    this.playerOverlaySrc.set(this.sanitizer.bypassSecurityTrustResourceUrl(last.videoUrl));
+    this.playerOverlayTitle.set(last.title);
   }
 
   confirmRemoveDb(): void {
@@ -265,9 +268,13 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   navigateToPlayer(movie: Movie, previewUrl: string): void {
     this.closeLinkPicker();
     this.userData.setLastWatched({ ...movie, videoUrl: previewUrl });
-    this.router.navigate(['/player'], {
-      queryParams: { video: previewUrl, title: encodeURIComponent(movie.title) },
-    });
+    this.playerOverlaySrc.set(this.sanitizer.bypassSecurityTrustResourceUrl(previewUrl));
+    this.playerOverlayTitle.set(movie.title);
+  }
+
+  closePlayerOverlay(): void {
+    this.playerOverlaySrc.set(null);
+    this.playerOverlayTitle.set('');
   }
 
   closeLinkPicker(): void {
