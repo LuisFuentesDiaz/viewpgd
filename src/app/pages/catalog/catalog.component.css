@@ -16,6 +16,13 @@
   flex-direction: column;
 }
 
+/* Con el reproductor en overlay abierto: bloquear scroll del catálogo */
+.catalog-page--player-open .catalog-main,
+.catalog-page--player-open .movie-list {
+  overflow: hidden !important;
+  touch-action: none;
+}
+
 /* Barra superior: al ocultarse, margen negativo; el .catalog-main crece hacia arriba, el borde de abajo no se mueve */
 .catalog-top-bar {
   position: sticky;
@@ -861,11 +868,14 @@
   position: fixed;
   inset: 0;
   z-index: 110;
+  width: 100%;
+  height: 100dvh;
+  height: 100vh;
   background: var(--vp-bg);
   display: flex;
   flex-direction: column;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing: border-box;
 }
 
 .player-overlay-header {
@@ -909,7 +919,7 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   padding: 0.5rem;
 }
@@ -917,7 +927,7 @@
 .player-overlay-video {
   width: 100%;
   height: 100%;
-  min-height: 50vh;
+  min-height: 0;
   max-height: calc(100dvh - 4rem);
   border: none;
   border-radius: var(--vp-radius-sm);
@@ -945,8 +955,47 @@
   }
 
   .player-overlay-video {
-    min-height: 40vh;
     max-height: calc(100dvh - 3.5rem);
     border-radius: 0;
+  }
+}
+
+/* Horizontal / pantalla completa: que el video ocupe bien */
+@media (orientation: landscape) {
+  .player-overlay-video-wrap {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .player-overlay-video {
+    max-height: none;
+    min-height: 0;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .player-overlay-header {
+    padding: 0.35rem 0.5rem;
+    min-height: 2.25rem;
+  }
+
+  .player-overlay-back {
+    min-height: 2rem;
+    min-width: 2rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .player-overlay-title {
+    font-size: 0.8rem;
+  }
+
+  .player-overlay-video-wrap {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .player-overlay-video {
+    max-height: none;
   }
 }

@@ -1,10 +1,15 @@
 .player-page {
   min-height: 100dvh;
+  height: 100dvh;
+  height: 100vh;
   background: var(--vp-bg);
   color: var(--vp-text);
   font-family: var(--vp-font-body);
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 .player-header {
@@ -48,7 +53,7 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   padding: 0.5rem;
 }
@@ -56,7 +61,7 @@
 .video {
   width: 100%;
   height: 100%;
-  min-height: 50vh;
+  min-height: 0;
   max-height: calc(100dvh - 4rem);
   border: none;
   border-radius: var(--vp-radius-sm);
@@ -107,7 +112,6 @@
   }
 
   .video {
-    min-height: 40vh;
     max-height: calc(100dvh - 3.5rem);
     border-radius: 0;
   }
@@ -115,5 +119,44 @@
   .no-video {
     padding: 1.5rem 1rem;
     padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Horizontal / pantalla completa */
+@media (orientation: landscape) {
+  .video-wrap {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .video {
+    max-height: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .player-header {
+    padding: 0.35rem 0.5rem;
+    min-height: 2.25rem;
+  }
+
+  .btn-back {
+    min-height: 2rem;
+    min-width: 2rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .player-title {
+    font-size: 0.8rem;
+  }
+
+  .video-wrap {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .video {
+    max-height: none;
   }
 }

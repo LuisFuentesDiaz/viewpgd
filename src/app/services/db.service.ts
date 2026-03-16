@@ -3,8 +3,9 @@ import { Inject, Injectable, Optional } from '@angular/core';
 import type { Movie } from '../models/movie';
 
 const DB_PATH = 'assets/scrapgd.db';
-/** v_movies_catalog: name, year, quality, url_poster, preview. Para "Más recientes": upload_date (TEXT, formato YYYY-MM-DD HH:MM:SS). */
+/** v_movies_catalog: name, year, quality, url_poster, preview. Para "Más recientes": upload_date (TEXT, formato YYYY-MM-DD HH:MM:SS). Opcional: file_size (si falta o es 'fail' no se muestra la película). */
 const CATALOG_VIEW = 'v_movies_catalog';
+const FILE_SIZE_FILTER = ` file_size IS NOT NULL AND LOWER(TRIM(CAST(file_size AS TEXT))) <> 'fail'`;
 
 interface SqlDbResultRow {
   columns: string[];
@@ -109,7 +110,7 @@ export class DbService {
     const db = await this.openDb();
     try {
       const result = db.exec(
-        `SELECT DISTINCT year FROM (SELECT name, year FROM ${CATALOG_VIEW} GROUP BY name, year) ORDER BY year DESC`
+        `SELECT DISTINCT year FROM (SELECT name, year FROM ${CATALOG_VIEW} WHERE${FILE_SIZE_FILTER} GROUP BY name, year) ORDER BY year DESC`
       );
       db.close();
       if (!result.length || !result[0].values.length) return [];
@@ -124,11 +125,11 @@ export class DbService {
   async getMoviesCount(search?: string, year?: number): Promise<number> {
     const db = await this.openDb();
     try {
-      let where = '';
-      if (search?.trim()) where += ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
-      if (year != null && !Number.isNaN(year)) where += (where ? ' AND ' : ' WHERE ') + ` year = ${year}`;
+      let where = FILE_SIZE_FILTER;
+      if (search?.trim()) where += ` AND LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
+      if (year != null && !Number.isNaN(year)) where += ` AND year = ${year}`;
       const result = db.exec(
-        `SELECT COUNT(*) AS n FROM (SELECT name, year FROM ${CATALOG_VIEW}${where} GROUP BY name, year)`
+        `SELECT COUNT(*) AS n FROM (SELECT name, year FROM ${CATALOG_VIEW} WHERE${where} GROUP BY name, year)`
       );
       db.close();
       if (!result.length || !result[0].values.length) return 0;
@@ -150,15 +151,15 @@ export class DbService {
   ): Promise<Movie[]> {
     const db = await this.openDb();
     try {
-      let where = '';
-      if (search?.trim()) where += ` WHERE LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
-      if (year != null && !Number.isNaN(year)) where += (where ? ' AND ' : ' WHERE ') + ` year = ${year}`;
+      let where = FILE_SIZE_FILTER;
+      if (search?.trim()) where += ` AND LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
+      if (year != null && !Number.isNaN(year)) where += ` AND year = ${year}`;
       const ob = orderBy === 'name' ? 'name' : orderBy === 'upload_date' ? 'upload_date' : 'year';
       const dir = order === 'asc' ? 'ASC' : 'DESC';
       const result = db.exec(
         `SELECT * FROM (
           SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
-          FROM ${CATALOG_VIEW}${where}
+          FROM ${CATALOG_VIEW} WHERE${where}
         ) t WHERE rn = 1 ORDER BY ${ob} ${dir} LIMIT ${Math.max(0, limit)} OFFSET ${Math.max(0, offset)}`
       );
       db.close();
@@ -182,7 +183,7 @@ export class DbService {
     try {
       const yearVal = typeof year === 'string' ? year : String(year);
       const result = db.exec(
-        `SELECT preview FROM ${CATALOG_VIEW} WHERE name = '${this.escapeSql(name)}' AND year = '${this.escapeSql(yearVal)}'`
+        `SELECT preview FROM ${CATALOG_VIEW} WHERE${FILE_SIZE_FILTER} AND name = '${this.escapeSql(name)}' AND year = '${this.escapeSql(yearVal)}'`
       );
       db.close();
       if (!result.length || !result[0].values.length) return [];
@@ -226,7 +227,7 @@ export class DbService {
       const result = db.exec(
         `SELECT * FROM (
           SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
-          FROM ${CATALOG_VIEW}
+          FROM ${CATALOG_VIEW} WHERE${FILE_SIZE_FILTER}
         ) t WHERE rn = 1 ORDER BY year DESC`
       );
       db.close();

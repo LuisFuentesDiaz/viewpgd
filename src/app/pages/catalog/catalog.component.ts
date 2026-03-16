@@ -3,6 +3,7 @@ import {
   inject,
   signal,
   computed,
+  effect,
   OnInit,
   AfterViewInit,
   ViewChild,
@@ -77,6 +78,14 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   private intersectionObserver: IntersectionObserver | null = null;
   private lastScrollY = 0;
   private readonly scrollThreshold = 80;
+
+  constructor() {
+    effect(() => {
+      const open = this.playerOverlaySrc() != null;
+      document.body.style.overflow = open ? 'hidden' : '';
+      document.body.style.touchAction = open ? 'none' : '';
+    });
+  }
 
   ngOnInit(): void {
     if (!this.db.hasCustomDb()) {
@@ -223,6 +232,8 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    document.body.style.overflow = '';
+    document.body.style.touchAction = '';
     if (this.filterDebounceTimer != null) clearTimeout(this.filterDebounceTimer);
     this.intersectionObserver?.disconnect();
     this.intersectionObserver = null;

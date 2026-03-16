@@ -1,4 +1,4 @@
-<div class="catalog-page">
+<div class="catalog-page" [class.catalog-page--player-open]="playerOverlaySrc() != null">
   <div class="catalog-top-bar" [class.nav--hidden]="showFullCatalog() && !navVisible()">
     <header class="nav">
       <div class="nav-row">
