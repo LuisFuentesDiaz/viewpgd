@@ -47,7 +47,10 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('movieGrid') movieGridRef?: ElementRef<HTMLUListElement>;
   @ViewChild('loadMoreSentinel') sentinelRef?: ElementRef<HTMLElement>;
-  @ViewChild('mainScroller') mainScrollerRef?: ElementRef<HTMLElement>;
+  @ViewChild('homeScroll') homeScrollRef?: ElementRef<HTMLElement>;
+  @ViewChild('exploreScroll') exploreScrollRef?: ElementRef<HTMLElement>;
+  @ViewChild('favoritesScroll') favoritesScrollRef?: ElementRef<HTMLElement>;
+  @ViewChild('historyScroll') historyScrollRef?: ElementRef<HTMLElement>;
 
   readonly activeTab = signal<Tab>('home');
   readonly movies = signal<Movie[]>([]);
@@ -55,8 +58,6 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly orderBy = signal<OrderBy>('upload_date');
   readonly order = signal<Order>('desc');
   readonly favoritesOnly = signal(false);
-  readonly viewMode = signal<'grid' | 'list'>('grid');
-  readonly navVisible = signal(true);
   readonly recentMovies = signal<Movie[]>([]);
   readonly carousels = signal<YearCarousel[]>([]);
   readonly carouselsLoading = signal(true);
@@ -104,8 +105,6 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private intersectionObserver: IntersectionObserver | null = null;
-  private lastScrollY = 0;
-  private readonly scrollThreshold = 80;
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
   private longPressFired = false;
 
@@ -250,10 +249,6 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     if (by && dir) this.setOrder(by, dir);
   }
 
-  toggleViewMode(): void {
-    this.viewMode.update((v) => (v === 'grid' ? 'list' : 'grid'));
-  }
-
   scrollCarousel(event: Event, direction: -1 | 1): void {
     const button = event.currentTarget as HTMLElement | null;
     const section = button?.closest('section');
@@ -356,22 +351,22 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     this.linkPickerOptions.set([]);
   }
 
-  onMainScroll(e: Event): void {
-    const el = e.target as HTMLElement;
-    const scrollTop = el.scrollTop;
-    if (scrollTop <= this.scrollThreshold) {
-      this.navVisible.set(true);
-    } else if (scrollTop > this.lastScrollY) {
-      this.navVisible.set(false);
-    } else {
-      this.navVisible.set(true);
+  private activeScrollRef(): ElementRef<HTMLElement> | undefined {
+    switch (this.activeTab()) {
+      case 'home':      return this.homeScrollRef;
+      case 'explore':   return this.exploreScrollRef;
+      case 'favorites': return this.favoritesScrollRef;
+      case 'history':   return this.historyScrollRef;
     }
-    this.lastScrollY = scrollTop;
-    this.showScrollTop.set(scrollTop > 600);
+  }
+
+  onTabScroll(event: Event): void {
+    const el = event.target as HTMLElement;
+    this.showScrollTop.set(el.scrollTop > 300);
   }
 
   scrollToTop(): void {
-    this.mainScrollerRef?.nativeElement?.scrollTo({ top: 0, behavior: 'smooth' });
+    this.activeScrollRef()?.nativeElement?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   toggleFavorite(event: Event, id: string): void {
