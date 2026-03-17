@@ -10,17 +10,19 @@ import {
   ElementRef,
   OnDestroy,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import type { Movie } from '../../models/movie';
 import { DbService } from '../../services/db.service';
-import { UserDataService } from '../../services/user-data.service';
+import { UserDataService, type HistoryEntry } from '../../services/user-data.service';
+import { LazyImgDirective } from '../../directives/lazy-img.directive';
 
 const PAGE_SIZE = 30;
 const CAROUSEL_SIZE = 15;
 const MAX_CAROUSEL_YEARS = 5;
 type OrderBy = 'year' | 'name' | 'upload_date';
 type Order = 'asc' | 'desc';
+type Tab = 'home' | 'explore' | 'favorites' | 'history';
 
 export interface YearCarousel {
   year: number;
@@ -30,9 +32,12 @@ export interface YearCarousel {
 @Component({
   selector: 'app-catalog',
   standalone: true,
-  imports: [RouterLink],
+  imports: [LazyImgDirective],
   templateUrl: './catalog.component.html',
   styleUrl: './catalog.component.css',
+  host: {
+    '(document:keydown)': 'onKeydown($event)',
+  },
 })
 export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   private db = inject(DbService);
@@ -42,14 +47,15 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('movieGrid') movieGridRef?: ElementRef<HTMLUListElement>;
   @ViewChild('loadMoreSentinel') sentinelRef?: ElementRef<HTMLElement>;
+  @ViewChild('mainScroller') mainScrollerRef?: ElementRef<HTMLElement>;
 
+  readonly activeTab = signal<Tab>('home');
   readonly movies = signal<Movie[]>([]);
   readonly filterQuery = signal('');
   readonly orderBy = signal<OrderBy>('upload_date');
   readonly order = signal<Order>('desc');
   readonly favoritesOnly = signal(false);
   readonly viewMode = signal<'grid' | 'list'>('grid');
-  readonly showFullCatalog = signal(false);
   readonly navVisible = signal(true);
   readonly recentMovies = signal<Movie[]>([]);
   readonly carousels = signal<YearCarousel[]>([]);
@@ -59,12 +65,16 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly hasMore = signal(true);
   readonly totalCount = signal<number | null>(null);
   readonly error = signal<string | null>(null);
+  readonly showScrollTop = signal(false);
   readonly linkPickerMovie = signal<Movie | null>(null);
   readonly linkPickerOptions = signal<string[]>([]);
   readonly playerOverlaySrc = signal<SafeResourceUrl | null>(null);
   readonly playerOverlayTitle = signal<string>('');
+  readonly detailMovie = signal<Movie | null>(null);
+  readonly searchOpen = signal(false);
 
   readonly favoritesSet = this.userData.favorites;
+  readonly watchHistory = this.userData.history;
 
   readonly displayedMovies = computed(() => {
     const list = this.movies();
@@ -74,10 +84,30 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     return list;
   });
 
+  readonly favoriteMovies = computed(() => {
+    return this.movies().filter((m) => this.favoritesSet().has(m.id));
+  });
+
+  readonly catalogStats = computed(() => {
+    const count = this.totalCount();
+    const carouselsData = this.carousels();
+    const yearsSet = new Set<number>();
+    for (const c of carouselsData) yearsSet.add(c.year);
+    for (const m of this.recentMovies()) yearsSet.add(m.year);
+    return {
+      totalMovies: count ?? 0,
+      totalYears: yearsSet.size,
+      totalFavorites: this.favoritesSet().size,
+      totalWatched: this.watchHistory().length,
+    };
+  });
+
   private filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private intersectionObserver: IntersectionObserver | null = null;
   private lastScrollY = 0;
   private readonly scrollThreshold = 80;
+  private longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  private longPressFired = false;
 
   constructor() {
     effect(() => {
@@ -93,6 +123,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     this.loadCarousels();
+    this.db.getMoviesCount().then((n) => this.totalCount.set(n)).catch(() => {});
   }
 
   private loadCarousels(): void {
@@ -121,14 +152,30 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
-  showFullCatalogView(): void {
-    this.showFullCatalog.set(true);
-    this.navVisible.set(true);
-    this.loadFirstPage();
+  switchTab(tab: Tab): void {
+    this.activeTab.set(tab);
+    if (tab === 'explore' && this.movies().length === 0) {
+      this.loadFirstPage();
+    }
+    if (tab === 'favorites' && this.movies().length === 0) {
+      this.loadAllForFavorites();
+    }
   }
 
-  showCarouselsView(): void {
-    this.showFullCatalog.set(false);
+  private loadAllForFavorites(): void {
+    if (this.movies().length > 0) return;
+    this.loading.set(true);
+    this.db
+      .getMoviesPage(0, 500, undefined, 'name', 'asc')
+      .then((list) => {
+        this.movies.set(list);
+        this.loading.set(false);
+      })
+      .catch(() => this.loading.set(false));
+  }
+
+  showExploreView(): void {
+    this.switchTab('explore');
   }
 
   private loadFirstPage(): void {
@@ -136,7 +183,6 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     this.error.set(null);
     this.movies.set([]);
     this.hasMore.set(true);
-    this.totalCount.set(null);
     const search = this.filterQuery().trim() || undefined;
     this.db
       .getMoviesPage(0, PAGE_SIZE, search, this.orderBy(), this.order())
@@ -173,12 +219,23 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.filterDebounceTimer != null) clearTimeout(this.filterDebounceTimer);
     this.filterDebounceTimer = setTimeout(() => {
       this.filterDebounceTimer = null;
-      if (this.showFullCatalog()) {
+      if (this.activeTab() === 'explore') {
         this.loadFirstPage();
       } else {
-        this.showFullCatalogView();
+        this.switchTab('explore');
       }
     }, 400);
+  }
+
+  toggleSearch(): void {
+    const open = !this.searchOpen();
+    this.searchOpen.set(open);
+    if (open) {
+      setTimeout(() => {
+        const input = document.querySelector<HTMLInputElement>('.search-bar__input');
+        input?.focus();
+      }, 50);
+    }
   }
 
   setOrder(by: OrderBy, dir: Order): void {
@@ -193,12 +250,18 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     if (by && dir) this.setOrder(by, dir);
   }
 
-  toggleFavoritesOnly(): void {
-    this.favoritesOnly.update((v) => !v);
-  }
-
   toggleViewMode(): void {
     this.viewMode.update((v) => (v === 'grid' ? 'list' : 'grid'));
+  }
+
+  scrollCarousel(event: Event, direction: -1 | 1): void {
+    const button = event.currentTarget as HTMLElement | null;
+    const section = button?.closest('section');
+    const container = section?.querySelector<HTMLElement>('.carousel');
+    if (!container) return;
+    const card = container.querySelector<HTMLElement>('.card');
+    const step = card ? card.offsetWidth * 3 : container.clientWidth * 0.8;
+    container.scrollBy({ left: step * direction, behavior: 'smooth' });
   }
 
   ngAfterViewInit(): void {}
@@ -207,7 +270,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     const trySetup = (attempt = 0) => {
       if (attempt > 5) return;
       this.setupSentinelObserver();
-      if (!this.intersectionObserver && this.showFullCatalog() && !this.loading()) {
+      if (!this.intersectionObserver && this.activeTab() === 'explore' && !this.loading()) {
         setTimeout(() => trySetup(attempt + 1), 100);
       }
     };
@@ -219,7 +282,6 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     this.intersectionObserver = null;
     const sentinel = this.sentinelRef?.nativeElement;
     if (!sentinel) return;
-    // Usar viewport (root: null): más fiable que el scroll del ul con flex; dispara cuando el sentinela entra en pantalla
     this.intersectionObserver = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && this.hasMore() && !this.loadingMore() && !this.loading()) {
@@ -241,13 +303,13 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly lastWatched = this.userData.lastWatchedMovie;
 
-  goHome(): void {
-    this.router.navigate(['/']);
-  }
-
   continueWatching(): void {
     const last = this.userData.lastWatchedMovie();
     if (!last?.videoUrl) return;
+    this.userData.setLastWatched({
+      id: last.id, title: last.title, videoUrl: last.videoUrl,
+      poster: last.poster, quality: '', year: last.year,
+    });
     this.playerOverlaySrc.set(this.sanitizer.bypassSecurityTrustResourceUrl(last.videoUrl));
     this.playerOverlayTitle.set(last.title);
   }
@@ -263,6 +325,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   onPosterLoad(event: Event): void {
     (event.target as HTMLImageElement).classList.add('loaded');
   }
+
 
   playMovie(movie: Movie): void {
     this.db.getPreviewOptionsForMovie(movie.title, movie.year).then((options) => {
@@ -293,7 +356,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     this.linkPickerOptions.set([]);
   }
 
-  onListScroll(e: Event): void {
+  onMainScroll(e: Event): void {
     const el = e.target as HTMLElement;
     const scrollTop = el.scrollTop;
     if (scrollTop <= this.scrollThreshold) {
@@ -304,6 +367,11 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
       this.navVisible.set(true);
     }
     this.lastScrollY = scrollTop;
+    this.showScrollTop.set(scrollTop > 600);
+  }
+
+  scrollToTop(): void {
+    this.mainScrollerRef?.nativeElement?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   toggleFavorite(event: Event, id: string): void {
@@ -313,5 +381,79 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   isFavorite(id: string): boolean {
     return this.favoritesSet().has(id);
+  }
+
+  onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      if (this.playerOverlaySrc()) { this.closePlayerOverlay(); return; }
+      if (this.linkPickerMovie()) { this.closeLinkPicker(); return; }
+      if (this.detailMovie()) { this.closeDetail(); return; }
+      if (this.searchOpen()) { this.searchOpen.set(false); return; }
+    }
+    if (event.key === '/' && !this.isInputFocused()) {
+      event.preventDefault();
+      this.searchOpen.set(true);
+      setTimeout(() => document.querySelector<HTMLInputElement>('.search-bar__input')?.focus(), 50);
+    }
+  }
+
+  private isInputFocused(): boolean {
+    const tag = document.activeElement?.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  onCardPointerDown(event: Event, movie: Movie): void {
+    this.longPressFired = false;
+    this.longPressTimer = setTimeout(() => {
+      this.longPressFired = true;
+      this.showDetail(movie);
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 500);
+  }
+
+  onCardPointerUp(): void {
+    if (this.longPressTimer) { clearTimeout(this.longPressTimer); this.longPressTimer = null; }
+  }
+
+  onCardClick(event: Event, movie: Movie): void {
+    if (this.longPressFired) { event.preventDefault(); event.stopPropagation(); return; }
+    this.playMovie(movie);
+  }
+
+  showDetail(movie: Movie): void { this.detailMovie.set(movie); }
+  closeDetail(): void { this.detailMovie.set(null); }
+
+  playFromDetail(): void {
+    const movie = this.detailMovie();
+    if (!movie) return;
+    this.closeDetail();
+    this.playMovie(movie);
+  }
+
+  toggleFavoriteFromDetail(): void {
+    const movie = this.detailMovie();
+    if (!movie) return;
+    this.userData.toggleFavorite(movie.id);
+  }
+
+  playHistoryEntry(entry: HistoryEntry): void {
+    this.userData.setLastWatched({
+      id: entry.id, title: entry.title, videoUrl: entry.videoUrl,
+      poster: entry.poster, quality: '', year: entry.year,
+    });
+    this.playerOverlaySrc.set(this.sanitizer.bypassSecurityTrustResourceUrl(entry.videoUrl));
+    this.playerOverlayTitle.set(entry.title);
+  }
+
+  timeAgo(timestamp: number): string {
+    const diff = Date.now() - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Justo ahora';
+    if (mins < 60) return `Hace ${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Hace ${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `Hace ${days}d`;
+    return `Hace ${Math.floor(days / 7)} sem`;
   }
 }

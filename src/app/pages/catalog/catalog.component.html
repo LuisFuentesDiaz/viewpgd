@@ -1,281 +1,524 @@
-<div class="catalog-page" [class.catalog-page--player-open]="playerOverlaySrc() != null">
-  <div class="catalog-top-bar" [class.nav--hidden]="showFullCatalog() && !navVisible()">
-    <header class="nav">
-      <div class="nav-row">
-        @if (showFullCatalog()) {
-            <button type="button" class="nav-brand" (click)="showCarouselsView()" aria-label="Volver al menú">
-              <img src="assets/icon.png" alt="" class="nav-brand-icon" width="28" height="28" />
-              <span>Viewpgd</span>
-            </button>
-          } @else {
-            <a class="nav-brand" routerLink="/catalog">
-              <img src="assets/icon.png" alt="" class="nav-brand-icon" width="28" height="28" />
-              <span>Viewpgd</span>
-            </a>
-          }
-        <div class="nav-search-wrap">
-          <span class="nav-search-icon" aria-hidden="true">⌕</span>
+<div class="app-shell" [class.app-shell--player-open]="playerOverlaySrc() != null">
+  <!-- ===== TOP NAV (desktop) ===== -->
+  <header class="top-nav">
+    <div class="top-nav__inner">
+      <div class="top-nav__brand" (click)="switchTab('home')">
+        <img src="assets/icon.png" alt="" width="28" height="28" class="top-nav__logo" />
+        <span class="top-nav__name">Viewpgd</span>
+      </div>
+      <nav class="top-nav__tabs">
+        <button type="button" class="top-nav__tab" [class.top-nav__tab--active]="activeTab() === 'home'" (click)="switchTab('home')">Inicio</button>
+        <button type="button" class="top-nav__tab" [class.top-nav__tab--active]="activeTab() === 'explore'" (click)="switchTab('explore')">Explorar</button>
+        <button type="button" class="top-nav__tab" [class.top-nav__tab--active]="activeTab() === 'favorites'" (click)="switchTab('favorites')">Favoritos</button>
+        <button type="button" class="top-nav__tab" [class.top-nav__tab--active]="activeTab() === 'history'" (click)="switchTab('history')">Historial</button>
+      </nav>
+      <div class="top-nav__actions">
+        <div class="top-nav__search-wrap">
+          <svg class="top-nav__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input
             type="search"
-            class="nav-search"
+            class="top-nav__search"
             [value]="filterQuery()"
             (input)="onFilterInput($any($event.target).value)"
-            placeholder="Buscar películas"
+            placeholder="Buscar… (presiona /)"
             aria-label="Buscar películas"
           />
         </div>
-        <nav class="nav-actions">
-          @if (showFullCatalog()) {
-            @if (!loading() && !error()) {
-              <span class="nav-count">{{ displayedMovies().length }}{{ totalCount() !== null ? ' de ' + totalCount() : '' }}</span>
-            }
-          }
-          @if (!showFullCatalog()) {
-            <button type="button" class="nav-item nav-item--muted" (click)="confirmRemoveDb()">Quitar BD</button>
-          }
-        </nav>
+        <button type="button" class="top-nav__btn-remove" (click)="confirmRemoveDb()">Quitar BD</button>
       </div>
-      @if (showFullCatalog() && !loading() && !error()) {
-        <div class="toolbar">
-          <select
-            class="select-sort"
-            [value]="orderBy() + '-' + order()"
-            (change)="onOrderChange($event)"
-            aria-label="Ordenar por"
-          >
-            <option value="upload_date-desc">Más recientes</option>
-            <option value="upload_date-asc">Fecha de subida (más antigua)</option>
-            <option value="year-desc">Año (más reciente)</option>
-            <option value="year-asc">Año (más antiguo)</option>
-            <option value="name-asc">Nombre (A-Z)</option>
-            <option value="name-desc">Nombre (Z-A)</option>
-          </select>
-          <button
-            type="button"
-            class="btn-toggle"
-            [class.active]="favoritesOnly()"
-            (click)="toggleFavoritesOnly()"
-            aria-pressed="favoritesOnly()"
-            title="Solo favoritos"
-          >
-            ♥
+    </div>
+  </header>
+
+  <!-- SEARCH OVERLAY (mobile only) -->
+  @if (searchOpen()) {
+    <div class="search-overlay" (click)="searchOpen.set(false)">
+      <div class="search-bar" (click)="$event.stopPropagation()">
+        <svg class="search-bar__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input
+          type="search"
+          class="search-bar__input"
+          [value]="filterQuery()"
+          (input)="onFilterInput($any($event.target).value)"
+          placeholder="Buscar películas…"
+          aria-label="Buscar"
+        />
+        <button type="button" class="search-bar__close" (click)="searchOpen.set(false)">Esc</button>
+      </div>
+    </div>
+  }
+
+  <!-- MAIN CONTENT AREA -->
+  <main #mainScroller class="main-content" (scroll)="onMainScroll($event)">
+    <!-- ========== TAB: HOME ========== -->
+    @if (activeTab() === 'home') {
+      <div class="mobile-header">
+        <div class="mobile-header__brand">
+          <img src="assets/icon.png" alt="" width="24" height="24" class="mobile-header__logo" />
+          <span class="mobile-header__name">Viewpgd</span>
+        </div>
+        <div class="mobile-header__actions">
+          <button type="button" class="mobile-header__btn" (click)="toggleSearch()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           </button>
-          <button
-            type="button"
-            class="btn-toggle"
-            (click)="toggleViewMode()"
-            [attr.aria-label]="viewMode() === 'grid' ? 'Vista lista' : 'Vista grid'"
-            title="{{ viewMode() === 'grid' ? 'Vista en lista' : 'Vista en grid' }}"
-          >
-            {{ viewMode() === 'grid' ? '☷' : '⊞' }}
+          <button type="button" class="mobile-header__btn mobile-header__btn--muted" (click)="confirmRemoveDb()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      @if (carouselsLoading()) {
+        <div class="skeleton-grid">
+          @for (i of [1,2]; track i) {
+            <div class="skeleton-section">
+              <div class="skeleton-title"></div>
+              <div class="skeleton-row">
+                @for (j of [1,2,3,4]; track j) {
+                  <div class="skeleton-card"><div class="skeleton-poster"></div><div class="skeleton-text"></div></div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <!-- HERO -->
+        @if (lastWatched(); as last) {
+          <section class="hero" aria-label="Continuar viendo">
+            @if (last.poster) {
+              <div class="hero__bg" [style.background-image]="'url(' + last.poster + ')'"></div>
+            }
+            <div class="hero__content">
+              <p class="hero__label">Continuar viendo</p>
+              <h2 class="hero__title">{{ last.title }}</h2>
+              <p class="hero__year">{{ last.year }}</p>
+              <button type="button" class="hero__play-btn" (click)="continueWatching()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Reproducir
+              </button>
+            </div>
+          </section>
+        }
+
+        <!-- STATS -->
+        @if (catalogStats(); as stats) {
+          <section class="stats" aria-label="Estadísticas">
+            <div class="stat"><span class="stat__value">{{ stats.totalMovies }}</span><span class="stat__label">Películas</span></div>
+            <div class="stat"><span class="stat__value">{{ stats.totalYears }}</span><span class="stat__label">Años</span></div>
+            <div class="stat"><span class="stat__value">{{ stats.totalFavorites }}</span><span class="stat__label">Favoritos</span></div>
+            <div class="stat"><span class="stat__value">{{ stats.totalWatched }}</span><span class="stat__label">Vistas</span></div>
+          </section>
+        }
+
+        <!-- HISTORY ROW -->
+        @if (watchHistory().length > 1) {
+          <section class="section" aria-label="Historial">
+            <h2 class="section__title">Visto recientemente</h2>
+            <div class="carousel carousel--snap carousel--horizontal">
+              @for (entry of watchHistory(); track entry.watchedAt) {
+                <article class="hist-card" (click)="playHistoryEntry(entry)">
+                  <div class="hist-card__poster">
+                    @if (entry.poster) {
+                      <img [src]="entry.poster" [alt]="entry.title" loading="lazy" />
+                    } @else {
+                      <span class="poster-placeholder">▶</span>
+                    }
+                  </div>
+                  <div class="hist-card__info">
+                    <span class="hist-card__title">{{ entry.title }}</span>
+                    <span class="hist-card__time">{{ timeAgo(entry.watchedAt) }}</span>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- RECENT -->
+        @if (recentMovies().length > 0) {
+          <section class="section" aria-label="Más recientes">
+            <div class="section__header">
+              <h2 class="section__title">Más recientes</h2>
+              <div class="section__nav section__nav--desktop">
+                <button type="button" class="section__nav-btn" (click)="scrollCarousel($event, -1)" aria-label="Anterior recientes">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button type="button" class="section__nav-btn" (click)="scrollCarousel($event, 1)" aria-label="Siguiente recientes">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="carousel carousel--snap">
+              @for (movie of recentMovies(); track movie.id) {
+                <article
+                  class="card"
+                  (click)="onCardClick($event, movie)"
+                  (pointerdown)="onCardPointerDown($event, movie)"
+                  (pointerup)="onCardPointerUp()"
+                  (pointerleave)="onCardPointerUp()"
+                >
+                  <div class="card__poster">
+                    @if (movie.poster) {
+                      <img [appLazySrc]="movie.poster" [alt]="movie.title" />
+                    } @else {
+                      <span class="poster-placeholder">▶</span>
+                    }
+                    <div class="card__overlay">
+                      <span class="card__play-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      </span>
+                    </div>
+                    @if (movie.quality) {
+                      <span class="card__badge">{{ movie.quality }}</span>
+                    }
+                    <span class="card__badge-year">{{ movie.year }}</span>
+                    <button type="button" class="card__fav" [class.card__fav--on]="isFavorite(movie.id)" (click)="toggleFavorite($event, movie.id)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    </button>
+                  </div>
+                  <h3 class="card__title">{{ movie.title }}</h3>
+                </article>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- BY YEAR -->
+        @for (carousel of carousels(); track carousel.year) {
+          <section class="section">
+            <div class="section__header">
+              <h2 class="section__title">{{ carousel.year }}</h2>
+              <div class="section__nav section__nav--desktop">
+                <button type="button" class="section__nav-btn" (click)="scrollCarousel($event, -1)" [attr.aria-label]="'Anterior ' + carousel.year">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button type="button" class="section__nav-btn" (click)="scrollCarousel($event, 1)" [attr.aria-label]="'Siguiente ' + carousel.year">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="carousel carousel--snap">
+              @for (movie of carousel.movies; track movie.id) {
+                <article
+                  class="card"
+                  (click)="onCardClick($event, movie)"
+                  (pointerdown)="onCardPointerDown($event, movie)"
+                  (pointerup)="onCardPointerUp()"
+                  (pointerleave)="onCardPointerUp()"
+                >
+                  <div class="card__poster">
+                    @if (movie.poster) {
+                      <img [appLazySrc]="movie.poster" [alt]="movie.title" />
+                    } @else {
+                      <span class="poster-placeholder">▶</span>
+                    }
+                    <div class="card__overlay">
+                      <span class="card__play-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      </span>
+                    </div>
+                    @if (movie.quality) {
+                      <span class="card__badge">{{ movie.quality }}</span>
+                    }
+                    <span class="card__badge-year">{{ movie.year }}</span>
+                    <button type="button" class="card__fav" [class.card__fav--on]="isFavorite(movie.id)" (click)="toggleFavorite($event, movie.id)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    </button>
+                  </div>
+                  <h3 class="card__title">{{ movie.title }}</h3>
+                </article>
+              }
+            </div>
+          </section>
+        }
+
+        <div class="explore-cta">
+          <button type="button" class="explore-cta__btn" (click)="showExploreView()">
+            Explorar todo el catálogo
           </button>
         </div>
       }
-    </header>
-  </div>
-
-  <main class="catalog-main">
-  @if (!showFullCatalog()) {
-    <!-- Vista carruseles por año -->
-    @if (carouselsLoading()) {
-      <div class="message message--loading">Cargando…</div>
-    } @else {
-      @if (lastWatched(); as last) {
-        <section class="continue-section" aria-label="Continuar viendo">
-          <h2 class="section-title">Continuar viendo</h2>
-          <div class="continue-row">
-            <button type="button" class="continue-card" (click)="continueWatching()">
-              @if (last.poster) {
-                <img [src]="last.poster" [alt]="last.title" class="continue-poster" />
-              } @else {
-                <span class="continue-poster-placeholder">▶</span>
-              }
-              <span class="continue-title">{{ last.title }}</span>
-              <span class="continue-year">{{ last.year }}</span>
-            </button>
-          </div>
-        </section>
-      }
-
-      @if (recentMovies().length > 0) {
-        <section class="carousel-section" aria-label="Películas más recientes">
-          <h2 class="section-title">Más recientes</h2>
-          <div class="carousel-row">
-            @for (movie of recentMovies(); track movie.id) {
-              <article class="movie-card movie-card--carousel" (click)="playMovie(movie)">
-                <div class="movie-poster-wrap">
-                  @if (movie.poster) {
-                    <img
-                      class="movie-poster"
-                      [src]="movie.poster"
-                      [alt]="movie.title"
-                      loading="lazy"
-                      (load)="onPosterLoad($event)"
-                    />
-                  } @else {
-                    <span class="movie-poster-placeholder">▶</span>
-                  }
-                  <span class="play-overlay" aria-hidden="true"><span class="play-icon">▶</span></span>
-                  <button
-                    type="button"
-                    class="btn-fav"
-                    [class.btn-fav--on]="isFavorite(movie.id)"
-                    (click)="toggleFavorite($event, movie.id)"
-                    [attr.aria-label]="isFavorite(movie.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
-                  >
-                    ♥
-                  </button>
-                </div>
-                <div class="movie-info">
-                  <h3 class="movie-title" [title]="movie.title">{{ movie.title }}</h3>
-                </div>
-              </article>
-            }
-          </div>
-        </section>
-      }
-
-      @for (carousel of carousels(); track carousel.year) {
-        <section class="carousel-section" [attr.aria-label]="'Películas de ' + carousel.year">
-          <h2 class="section-title">{{ carousel.year }}</h2>
-          <div class="carousel-row">
-            @for (movie of carousel.movies; track movie.id) {
-              <article class="movie-card movie-card--carousel" (click)="playMovie(movie)">
-                <div class="movie-poster-wrap">
-                  @if (movie.poster) {
-                    <img
-                      class="movie-poster"
-                      [src]="movie.poster"
-                      [alt]="movie.title"
-                      loading="lazy"
-                      (load)="onPosterLoad($event)"
-                    />
-                  } @else {
-                    <span class="movie-poster-placeholder">▶</span>
-                  }
-                  <span class="play-overlay" aria-hidden="true"><span class="play-icon">▶</span></span>
-                  <button
-                    type="button"
-                    class="btn-fav"
-                    [class.btn-fav--on]="isFavorite(movie.id)"
-                    (click)="toggleFavorite($event, movie.id)"
-                    [attr.aria-label]="isFavorite(movie.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
-                  >
-                    ♥
-                  </button>
-                </div>
-                <div class="movie-info">
-                  <h3 class="movie-title" [title]="movie.title">{{ movie.title }}</h3>
-                </div>
-              </article>
-            }
-          </div>
-        </section>
-      }
-
-      <section class="ver-todo-section">
-        <button type="button" class="btn-ver-todo" (click)="showFullCatalogView()">
-          Ver todo el catálogo
-        </button>
-      </section>
     }
-  } @else {
-    <!-- Vista catálogo completo -->
-    @if (loading()) {
-      <div class="message message--loading">Cargando películas…</div>
-    } @else if (error()) {
-      <p class="message error">{{ error() }}</p>
-    } @else {
-      <section class="library-section" aria-label="Catálogo completo">
-        @if (!filterQuery() && !favoritesOnly()) {
-          <h2 class="section-title">Todas las películas</h2>
+
+    <!-- ========== TAB: EXPLORE ========== -->
+    @if (activeTab() === 'explore') {
+      <div class="explore-header">
+        <h1 class="explore-header__title">Explorar</h1>
+        <div class="explore-header__tools">
+          <select class="tool-select" [value]="orderBy() + '-' + order()" (change)="onOrderChange($event)" aria-label="Ordenar">
+            <option value="upload_date-desc">Más recientes</option>
+            <option value="upload_date-asc">Más antiguas</option>
+            <option value="year-desc">Año ↓</option>
+            <option value="year-asc">Año ↑</option>
+            <option value="name-asc">A → Z</option>
+            <option value="name-desc">Z → A</option>
+          </select>
+          <button type="button" class="tool-btn" (click)="toggleViewMode()" [attr.aria-label]="viewMode() === 'grid' ? 'Vista lista' : 'Vista grid'">
+            @if (viewMode() === 'grid') {
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            } @else {
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            }
+          </button>
+        </div>
+      </div>
+
+      @if (loading()) {
+        <div class="skeleton-grid">
+          <div class="skeleton-section">
+            <div class="skeleton-row skeleton-row--grid">
+              @for (j of [1,2,3,4,5,6]; track j) {
+                <div class="skeleton-card"><div class="skeleton-poster"></div><div class="skeleton-text"></div></div>
+              }
+            </div>
+          </div>
+        </div>
+      } @else if (error()) {
+        <p class="message message--error">{{ error() }}</p>
+      } @else {
+        @if (totalCount() !== null) {
+          <p class="explore-count">{{ displayedMovies().length }} de {{ totalCount() }} películas</p>
         }
         <ul
           #movieGrid
-          class="movie-list"
-          [class.movie-list--grid]="viewMode() === 'grid'"
-          [class.movie-list--rows]="viewMode() === 'list'"
-          (scroll)="onListScroll($event)"
+          class="movie-grid"
+          [class.movie-grid--list]="viewMode() === 'list'"
         >
           @for (movie of displayedMovies(); track movie.id) {
-            <li>
-              <article class="movie-card" (click)="playMovie(movie)">
-                <div class="movie-poster-wrap">
+            <li class="movie-grid__item">
+              <article
+                class="card card--grid"
+                (click)="onCardClick($event, movie)"
+                (pointerdown)="onCardPointerDown($event, movie)"
+                (pointerup)="onCardPointerUp()"
+                (pointerleave)="onCardPointerUp()"
+              >
+                <div class="card__poster">
                   @if (movie.poster) {
-                    <img
-                      class="movie-poster"
-                      [src]="movie.poster"
-                      [alt]="movie.title"
-                      loading="lazy"
-                      (load)="onPosterLoad($event)"
-                    />
+                    <img [appLazySrc]="movie.poster" [alt]="movie.title" />
                   } @else {
-                    <span class="movie-poster-placeholder">▶</span>
+                    <span class="poster-placeholder">▶</span>
                   }
-                  <span class="play-overlay" aria-hidden="true"><span class="play-icon">▶</span></span>
-                  <button
-                    type="button"
-                    class="btn-fav"
-                    [class.btn-fav--on]="isFavorite(movie.id)"
-                    (click)="toggleFavorite($event, movie.id)"
-                    [attr.aria-label]="isFavorite(movie.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
-                  >
-                    ♥
+                  <div class="card__overlay">
+                    <span class="card__play-icon">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </span>
+                  </div>
+                  @if (movie.quality) {
+                    <span class="card__badge">{{ movie.quality }}</span>
+                  }
+                  <span class="card__badge-year">{{ movie.year }}</span>
+                  <button type="button" class="card__fav" [class.card__fav--on]="isFavorite(movie.id)" (click)="toggleFavorite($event, movie.id)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                   </button>
                 </div>
-                <div class="movie-info">
-                  <h2 class="movie-title" [title]="movie.title">{{ movie.title }}</h2>
-                  <span class="movie-year">{{ movie.year }}</span>
+                <div class="card__info">
+                  <h3 class="card__title">{{ movie.title }}</h3>
                 </div>
               </article>
             </li>
           }
-          <li class="sentinel-li">
-            <div #loadMoreSentinel class="load-more-sentinel"></div>
+          <li class="movie-grid__sentinel">
+            <div #loadMoreSentinel></div>
           </li>
         </ul>
         @if (loadingMore()) {
-          <p class="message message--loading-more">Cargando más…</p>
+          <div class="loading-more">
+            <div class="loading-more__spinner"></div>
+          </div>
         }
-      </section>
+      }
     }
-  }
+
+    <!-- ========== TAB: FAVORITES ========== -->
+    @if (activeTab() === 'favorites') {
+      <div class="tab-header">
+        <h1 class="tab-header__title">Favoritos</h1>
+      </div>
+      @if (loading()) {
+        <div class="skeleton-grid"><div class="skeleton-section"><div class="skeleton-row skeleton-row--grid">
+          @for (j of [1,2,3,4]; track j) { <div class="skeleton-card"><div class="skeleton-poster"></div><div class="skeleton-text"></div></div> }
+        </div></div></div>
+      } @else if (favoriteMovies().length === 0) {
+        <div class="empty-state">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <p class="empty-state__text">No tienes favoritos aún</p>
+          <p class="empty-state__hint">Mantén pulsado una película para agregarla</p>
+        </div>
+      } @else {
+        <ul class="movie-grid">
+          @for (movie of favoriteMovies(); track movie.id) {
+            <li class="movie-grid__item">
+              <article
+                class="card card--grid"
+                (click)="onCardClick($event, movie)"
+                (pointerdown)="onCardPointerDown($event, movie)"
+                (pointerup)="onCardPointerUp()"
+                (pointerleave)="onCardPointerUp()"
+              >
+                <div class="card__poster">
+                  @if (movie.poster) {
+                    <img [appLazySrc]="movie.poster" [alt]="movie.title" />
+                  } @else {
+                    <span class="poster-placeholder">▶</span>
+                  }
+                  <div class="card__overlay">
+                    <span class="card__play-icon">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </span>
+                  </div>
+                  <span class="card__badge-year">{{ movie.year }}</span>
+                  <button type="button" class="card__fav card__fav--on" (click)="toggleFavorite($event, movie.id)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                  </button>
+                </div>
+                <div class="card__info">
+                  <h3 class="card__title">{{ movie.title }}</h3>
+                </div>
+              </article>
+            </li>
+          }
+        </ul>
+      }
+    }
+
+    <!-- ========== TAB: HISTORY ========== -->
+    @if (activeTab() === 'history') {
+      <div class="tab-header">
+        <h1 class="tab-header__title">Historial</h1>
+      </div>
+      @if (watchHistory().length === 0) {
+        <div class="empty-state">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <p class="empty-state__text">Sin historial todavía</p>
+          <p class="empty-state__hint">Las películas que veas aparecerán aquí</p>
+        </div>
+      } @else {
+        <ul class="timeline">
+          @for (entry of watchHistory(); track entry.watchedAt) {
+            <li class="timeline__item" (click)="playHistoryEntry(entry)">
+              <div class="timeline__poster">
+                @if (entry.poster) {
+                  <img [src]="entry.poster" [alt]="entry.title" loading="lazy" />
+                } @else {
+                  <span class="poster-placeholder poster-placeholder--sm">▶</span>
+                }
+              </div>
+              <div class="timeline__info">
+                <span class="timeline__title">{{ entry.title }}</span>
+                <span class="timeline__meta">{{ entry.year }} · {{ timeAgo(entry.watchedAt) }}</span>
+              </div>
+              <svg class="timeline__play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </li>
+          }
+        </ul>
+      }
+    }
   </main>
 
-  @if (linkPickerMovie(); as movie) {
-    <div class="link-picker-backdrop" (click)="closeLinkPicker()" role="presentation"></div>
-    <div class="link-picker-modal" role="dialog" aria-labelledby="link-picker-title" aria-modal="true">
-      <h2 id="link-picker-title" class="link-picker-title">Elegir enlace</h2>
-      <p class="link-picker-subtitle">{{ movie.title }}</p>
-      <ul class="link-picker-list">
-        @for (url of linkPickerOptions(); track url; let i = $index) {
-          <li>
-            <button type="button" class="link-picker-btn" (click)="navigateToPlayer(movie, url)">
-              Enlace {{ i + 1 }}
-            </button>
-          </li>
+  <!-- SCROLL TO TOP -->
+  @if (showScrollTop()) {
+    <button type="button" class="fab-scroll-top" (click)="scrollToTop()" aria-label="Ir arriba">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
+  }
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav" aria-label="Navegación principal">
+    <button type="button" class="bottom-nav__item" [class.bottom-nav__item--active]="activeTab() === 'home'" (click)="switchTab('home')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span>Inicio</span>
+    </button>
+    <button type="button" class="bottom-nav__item" [class.bottom-nav__item--active]="activeTab() === 'explore'" (click)="switchTab('explore')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <span>Explorar</span>
+    </button>
+    <button type="button" class="bottom-nav__item" [class.bottom-nav__item--active]="activeTab() === 'favorites'" (click)="switchTab('favorites')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      <span>Favoritos</span>
+    </button>
+    <button type="button" class="bottom-nav__item" [class.bottom-nav__item--active]="activeTab() === 'history'" (click)="switchTab('history')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>Historial</span>
+    </button>
+    <button type="button" class="bottom-nav__item bottom-nav__item--search" (click)="toggleSearch()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </button>
+  </nav>
+
+  <!-- ===== MODALS ===== -->
+
+  <!-- DETAIL BOTTOM SHEET -->
+  @if (detailMovie(); as movie) {
+    <div class="sheet-backdrop" (click)="closeDetail()"></div>
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet__handle"></div>
+      <div class="sheet__poster-area">
+        @if (movie.poster) {
+          <img class="sheet__poster-img" [src]="movie.poster" [alt]="movie.title" />
+        } @else {
+          <div class="sheet__poster-placeholder">▶</div>
         }
-      </ul>
-      <button type="button" class="link-picker-cancel" (click)="closeLinkPicker()">Cancelar</button>
+        <button type="button" class="sheet__close" (click)="closeDetail()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet__body">
+        <h2 class="sheet__title">{{ movie.title }}</h2>
+        <div class="sheet__meta">
+          <span class="sheet__year">{{ movie.year }}</span>
+          @if (movie.quality) {
+            <span class="sheet__quality">{{ movie.quality }}</span>
+          }
+        </div>
+        <div class="sheet__actions">
+          <button type="button" class="sheet__btn sheet__btn--primary" (click)="playFromDetail()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Reproducir
+          </button>
+          <button
+            type="button"
+            class="sheet__btn sheet__btn--secondary"
+            [class.sheet__btn--fav-on]="isFavorite(movie.id)"
+            (click)="toggleFavoriteFromDetail()"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            {{ isFavorite(movie.id) ? 'Favorito' : 'Añadir' }}
+          </button>
+        </div>
+      </div>
     </div>
   }
 
+  <!-- LINK PICKER -->
+  @if (linkPickerMovie(); as movie) {
+    <div class="sheet-backdrop" (click)="closeLinkPicker()"></div>
+    <div class="sheet sheet--compact" role="dialog" aria-modal="true">
+      <div class="sheet__handle"></div>
+      <div class="sheet__body">
+        <h2 class="sheet__title">Elegir enlace</h2>
+        <p class="sheet__subtitle">{{ movie.title }}</p>
+        <div class="link-list">
+          @for (url of linkPickerOptions(); track url; let i = $index) {
+            <button type="button" class="link-list__btn" (click)="navigateToPlayer(movie, url)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Enlace {{ i + 1 }}
+            </button>
+          }
+        </div>
+        <button type="button" class="sheet__cancel" (click)="closeLinkPicker()">Cancelar</button>
+      </div>
+    </div>
+  }
+
+  <!-- PLAYER OVERLAY -->
   @if (playerOverlaySrc(); as url) {
-    <div class="player-overlay">
-      <header class="player-overlay-header">
-        <button type="button" class="player-overlay-back" (click)="closePlayerOverlay()" aria-label="Volver">
-          ← Volver
+    <div class="player">
+      <header class="player__header">
+        <button type="button" class="player__back" (click)="closePlayerOverlay()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <h1 class="player-overlay-title">{{ playerOverlayTitle() }}</h1>
+        <h1 class="player__title">{{ playerOverlayTitle() }}</h1>
       </header>
-      <div class="player-overlay-video-wrap">
-        <iframe
-          class="player-overlay-video"
-          [src]="url"
-          title="Reproductor"
-          allow="fullscreen; autoplay; picture-in-picture"
-          allowfullscreen
-        ></iframe>
+      <div class="player__video-wrap">
+        <iframe class="player__video" [src]="url" title="Reproductor" allow="fullscreen; autoplay; picture-in-picture" allowfullscreen></iframe>
       </div>
     </div>
   }

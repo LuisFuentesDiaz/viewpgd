@@ -1,33 +1,51 @@
-<div class="home-page">
+<div
+  class="home"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+  [class.home--dragging]="dragging()"
+>
   <input
     #fileInput
     type="file"
     accept=".db,.sqlite,.sqlite3"
-    class="file-input"
+    class="sr-only"
     (change)="onFileSelected($event)"
     aria-label="Seleccionar base de datos"
   />
+
+  <div class="home__glow"></div>
+
   @if (!hasDb && !loading()) {
-    <div class="home-load">
-      <div class="home-brand">
-        <img src="assets/icon.png" alt="" class="home-brand-icon" width="64" height="64" />
-        <h1 class="home-title">Viewpgd</h1>
+    <div class="home__content">
+      <div class="home__logo">
+        <img src="assets/icon.png" alt="" width="72" height="72" />
       </div>
-      <p class="home-tagline">Tu catálogo de películas en un solo lugar</p>
-      <div class="home-card">
-        <p class="home-hint">Necesitas un archivo SQLite con la vista <code>v_movies_catalog</code>.</p>
-        @if (error()) {
-          <p class="home-error">{{ error() }}</p>
-        }
-        <button type="button" class="home-btn" (click)="fileInput.click()">
-          Elegir archivo .db
-        </button>
+      <h1 class="home__title">Viewpgd</h1>
+      <p class="home__subtitle">Tu catálogo personal de películas</p>
+
+      <div class="home__drop-zone" (click)="fileInput.click()">
+        <div class="home__drop-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <p class="home__drop-text">Arrastra tu archivo <code>.db</code> aquí</p>
+        <p class="home__drop-hint">o haz clic para seleccionar</p>
       </div>
+
+      @if (error()) {
+        <p class="home__error">{{ error() }}</p>
+      }
+
+      <p class="home__footer">Requiere vista <code>v_movies_catalog</code></p>
     </div>
   } @else if (loading()) {
-    <div class="home-loading">
-      <img src="assets/icon.png" alt="" class="home-loading-icon" width="40" height="40" />
-      <p>Cargando…</p>
+    <div class="home__loader">
+      <div class="home__spinner"></div>
+      <p>Cargando catálogo…</p>
     </div>
   }
 </div>

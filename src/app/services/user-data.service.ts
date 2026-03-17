@@ -3,6 +3,8 @@ import type { Movie } from '../models/movie';
 
 const KEY_LAST_WATCHED = 'viewpgd-last-watched';
 const KEY_FAVORITES = 'viewpgd-favorites';
+const KEY_HISTORY = 'viewpgd-history';
+const MAX_HISTORY = 30;
 
 export interface LastWatched {
   id: string;
@@ -12,13 +14,19 @@ export interface LastWatched {
   year: number;
 }
 
+export interface HistoryEntry extends LastWatched {
+  watchedAt: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class UserDataService {
   private lastWatched = signal<LastWatched | null>(this.loadLastWatched());
   private favoritesIds = signal<Set<string>>(this.loadFavorites());
+  private historyList = signal<HistoryEntry[]>(this.loadHistory());
 
   readonly lastWatchedMovie = this.lastWatched.asReadonly();
   readonly favorites = computed(() => new Set(this.favoritesIds()));
+  readonly history = this.historyList.asReadonly();
 
   isFavorite(id: string): boolean {
     return this.favoritesIds().has(id);
@@ -33,6 +41,7 @@ export class UserDataService {
       year: movie.year,
     };
     this.lastWatched.set(data);
+    this.addToHistory(data);
     try {
       localStorage.setItem(KEY_LAST_WATCHED, JSON.stringify(data));
     } catch {}
@@ -42,6 +51,13 @@ export class UserDataService {
     this.lastWatched.set(null);
     try {
       localStorage.removeItem(KEY_LAST_WATCHED);
+    } catch {}
+  }
+
+  clearHistory(): void {
+    this.historyList.set([]);
+    try {
+      localStorage.removeItem(KEY_HISTORY);
     } catch {}
   }
 
@@ -57,6 +73,18 @@ export class UserDataService {
       localStorage.setItem(KEY_FAVORITES, JSON.stringify([...set]));
     } catch {}
     return set.has(id);
+  }
+
+  private addToHistory(entry: LastWatched): void {
+    const list = this.historyList().filter(
+      (h) => h.title !== entry.title || h.year !== entry.year
+    );
+    list.unshift({ ...entry, watchedAt: Date.now() });
+    const trimmed = list.slice(0, MAX_HISTORY);
+    this.historyList.set(trimmed);
+    try {
+      localStorage.setItem(KEY_HISTORY, JSON.stringify(trimmed));
+    } catch {}
   }
 
   private loadLastWatched(): LastWatched | null {
@@ -77,6 +105,17 @@ export class UserDataService {
       return new Set(Array.isArray(arr) ? arr : []);
     } catch {
       return new Set();
+    }
+  }
+
+  private loadHistory(): HistoryEntry[] {
+    try {
+      const raw = localStorage.getItem(KEY_HISTORY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch {
+      return [];
     }
   }
 }
