@@ -71,6 +71,8 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly linkPickerOptions = signal<string[]>([]);
   readonly playerOverlaySrc = signal<SafeResourceUrl | null>(null);
   readonly playerOverlayTitle = signal<string>('');
+  readonly playerMaximized = signal(false);
+  readonly playerHeaderHidden = signal(false);
   readonly detailMovie = signal<Movie | null>(null);
   readonly searchOpen = signal(false);
 
@@ -302,7 +304,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     const last = this.userData.lastWatchedMovie();
     if (!last?.videoUrl) return;
     this.userData.setLastWatched({
-      id: last.id, title: last.title, videoUrl: last.videoUrl,
+      id: last.id, title: last.title, originalName: last.title, videoUrl: last.videoUrl,
       poster: last.poster, quality: '', year: last.year,
     });
     this.playerOverlaySrc.set(this.sanitizer.bypassSecurityTrustResourceUrl(last.videoUrl));
@@ -323,7 +325,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
 
   playMovie(movie: Movie): void {
-    this.db.getPreviewOptionsForMovie(movie.title, movie.year).then((options) => {
+    this.db.getPreviewOptionsForMovie(movie.originalName, movie.year).then((options) => {
       if (options.length === 0) return;
       if (options.length === 1) {
         this.navigateToPlayer(movie, options[0]);
@@ -344,6 +346,18 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   closePlayerOverlay(): void {
     this.playerOverlaySrc.set(null);
     this.playerOverlayTitle.set('');
+    this.playerMaximized.set(false);
+    this.playerHeaderHidden.set(false);
+  }
+
+  togglePlayerMaximized(): void {
+    this.playerMaximized.update(v => !v);
+    this.playerHeaderHidden.set(false);
+  }
+
+  onVideoWrapClick(): void {
+    if (!this.playerMaximized()) return;
+    this.playerHeaderHidden.update(v => !v);
   }
 
   closeLinkPicker(): void {
@@ -412,7 +426,12 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onCardClick(event: Event, movie: Movie): void {
     if (this.longPressFired) { event.preventDefault(); event.stopPropagation(); return; }
-    this.playMovie(movie);
+    // En móvil/táctil: mostrar siempre el diálogo de detalle
+    if (navigator.maxTouchPoints > 0) {
+      this.showDetail(movie);
+    } else {
+      this.playMovie(movie);
+    }
   }
 
   showDetail(movie: Movie): void { this.detailMovie.set(movie); }
@@ -433,7 +452,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
 
   playHistoryEntry(entry: HistoryEntry): void {
     this.userData.setLastWatched({
-      id: entry.id, title: entry.title, videoUrl: entry.videoUrl,
+      id: entry.id, title: entry.title, originalName: entry.title, videoUrl: entry.videoUrl,
       poster: entry.poster, quality: '', year: entry.year,
     });
     this.playerOverlaySrc.set(this.sanitizer.bypassSecurityTrustResourceUrl(entry.videoUrl));
@@ -450,5 +469,44 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     const days = Math.floor(hours / 24);
     if (days < 7) return `Hace ${days}d`;
     return `Hace ${Math.floor(days / 7)} sem`;
+  }
+
+  formatUploadDate(raw?: string): string {
+    if (!raw) return '';
+    // Formato: "YYYY-MM-DD HH:MM:SS" o "YYYY-MM-DD"
+    const date = new Date(raw.replace(' ', 'T'));
+    if (isNaN(date.getTime())) return raw;
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  formatFileSize(raw?: string): string {
+    if (!raw) return '';
+    const trimmed = raw.trim();
+
+    // Ya tiene unidades con espacio: "1.5 GB", "500 MB"
+    if (/\d\s+[KMGT]?B/i.test(trimmed)) return trimmed;
+
+    // Tiene unidades pegadas: "1.5GB", "1.5G", "500MB", "500M"
+    const unitMatch = trimmed.match(/^([\d.]+)\s*([KMGT]?B?)$/i);
+    if (unitMatch) {
+      const val = parseFloat(unitMatch[1]);
+      const unit = unitMatch[2].toUpperCase();
+      if (!isNaN(val)) {
+        if (unit === 'GB' || unit === 'G') return `${val} GB`;
+        if (unit === 'MB' || unit === 'M') return val >= 1000 ? `${(val / 1024).toFixed(1)} GB` : `${val} MB`;
+        if (unit === 'KB' || unit === 'K') return val >= 1e6 ? `${(val / 1e6).toFixed(1)} GB` : val >= 1000 ? `${(val / 1024).toFixed(1)} MB` : `${val} KB`;
+        if (unit === 'TB' || unit === 'T') return `${val} TB`;
+      }
+    }
+
+    // Número puro — inferimos la unidad por magnitud
+    const num = parseFloat(trimmed);
+    if (isNaN(num)) return trimmed;
+    if (num >= 1e9) return `${(num / 1e9).toFixed(2)} GB`;   // bytes
+    if (num >= 1e6) return `${(num / 1e6).toFixed(1)} MB`;   // bytes
+    if (num >= 1e3) return `${(num / 1e3).toFixed(0)} KB`;   // bytes
+    // Número pequeño: asumir GB (ej. 1.5 almacenado como GB)
+    if (num >= 0.01) return `${num} GB`;
+    return trimmed;
   }
 }

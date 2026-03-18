@@ -158,7 +158,7 @@ export class DbService {
       const dir = order === 'asc' ? 'ASC' : 'DESC';
       const result = db.exec(
         `SELECT * FROM (
-          SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY upload_date DESC NULLS LAST, name, year) AS rn
           FROM ${CATALOG_VIEW} WHERE${where}
         ) t WHERE rn = 1 ORDER BY ${ob} ${dir} LIMIT ${Math.max(0, limit)} OFFSET ${Math.max(0, offset)}`
       );
@@ -197,6 +197,12 @@ export class DbService {
     }
   }
 
+  private extractDownloadUrl(previewUrl: string): string | undefined {
+    const match = previewUrl.match(/\/file\/d\/([^/?]+)/);
+    if (match) return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+    return undefined;
+  }
+
   private escapeSql(s: string): string {
     return s.replace(/\\/g, '\\\\').replace(/'/g, "''");
   }
@@ -226,7 +232,7 @@ export class DbService {
     try {
       const result = db.exec(
         `SELECT * FROM (
-          SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY name, year) AS rn
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY name, year ORDER BY upload_date DESC NULLS LAST, name, year) AS rn
           FROM ${CATALOG_VIEW} WHERE${FILE_SIZE_FILTER}
         ) t WHERE rn = 1 ORDER BY year DESC`
       );
@@ -255,15 +261,29 @@ export class DbService {
     columns.forEach((col, i) => {
       raw[col] = row[i];
     });
-    const name = String(raw['name'] ?? '');
+    const originalName = String(raw['name'] ?? '');
+    const name = raw['short_title'] != null && String(raw['short_title']).trim() !== ''
+      ? String(raw['short_title'])
+      : originalName;
     const year = Number(raw['year'] ?? 0);
+    const rawSize = raw['file_size'];
+    const fileSize = rawSize != null && String(rawSize).toLowerCase().trim() !== 'fail'
+      ? String(rawSize)
+      : undefined;
+    const uploadDate = raw['upload_date'] != null ? String(raw['upload_date']) : undefined;
+    const rawDownload = raw['download_url'] != null ? String(raw['download_url']) : undefined;
+    const downloadUrl = rawDownload || this.extractDownloadUrl(String(raw['preview'] ?? ''));
     return {
       id: raw['id'] != null ? String(raw['id']) : `movie-${index}`,
       title: name,
+      originalName,
       year,
       quality: String(raw['quality'] ?? ''),
       poster: raw['url_poster'] != null ? String(raw['url_poster']) : undefined,
       videoUrl: String(raw['preview'] ?? ''),
+      downloadUrl,
+      uploadDate,
+      fileSize,
     };
   }
 }
