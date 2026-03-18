@@ -4,7 +4,9 @@ import type { Movie } from '../models/movie';
 const KEY_LAST_WATCHED = 'viewpgd-last-watched';
 const KEY_FAVORITES = 'viewpgd-favorites';
 const KEY_HISTORY = 'viewpgd-history';
+const KEY_SEARCH_HISTORY = 'viewpgd-search-history';
 const MAX_HISTORY = 30;
+const MAX_SEARCH_HISTORY = 5;
 
 export interface LastWatched {
   id: string;
@@ -23,10 +25,12 @@ export class UserDataService {
   private lastWatched = signal<LastWatched | null>(this.loadLastWatched());
   private favoritesIds = signal<Set<string>>(this.loadFavorites());
   private historyList = signal<HistoryEntry[]>(this.loadHistory());
+  private searchHistoryList = signal<string[]>(this.loadSearchHistory());
 
   readonly lastWatchedMovie = this.lastWatched.asReadonly();
   readonly favorites = computed(() => new Set(this.favoritesIds()));
   readonly history = this.historyList.asReadonly();
+  readonly searchHistory = this.searchHistoryList.asReadonly();
 
   isFavorite(id: string): boolean {
     return this.favoritesIds().has(id);
@@ -58,6 +62,25 @@ export class UserDataService {
     this.historyList.set([]);
     try {
       localStorage.removeItem(KEY_HISTORY);
+    } catch {}
+  }
+
+  addSearchQuery(query: string): void {
+    const q = query.trim();
+    if (!q) return;
+    const list = this.searchHistoryList().filter((v) => v.toLowerCase() !== q.toLowerCase());
+    list.unshift(q);
+    const trimmed = list.slice(0, MAX_SEARCH_HISTORY);
+    this.searchHistoryList.set(trimmed);
+    try {
+      localStorage.setItem(KEY_SEARCH_HISTORY, JSON.stringify(trimmed));
+    } catch {}
+  }
+
+  clearSearchHistory(): void {
+    this.searchHistoryList.set([]);
+    try {
+      localStorage.removeItem(KEY_SEARCH_HISTORY);
     } catch {}
   }
 
@@ -114,6 +137,17 @@ export class UserDataService {
       if (!raw) return [];
       const arr = JSON.parse(raw);
       return Array.isArray(arr) ? arr : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private loadSearchHistory(): string[] {
+    try {
+      const raw = localStorage.getItem(KEY_SEARCH_HISTORY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.map((v) => String(v ?? '')).filter(Boolean) : [];
     } catch {
       return [];
     }

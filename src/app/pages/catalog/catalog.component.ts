@@ -41,7 +41,7 @@ export interface YearCarousel {
 })
 export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   private db = inject(DbService);
-  private userData = inject(UserDataService);
+  readonly userData = inject(UserDataService);
   private router = inject(Router);
   private sanitizer = inject(DomSanitizer);
 
@@ -69,15 +69,19 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly showScrollTop = signal(false);
   readonly linkPickerMovie = signal<Movie | null>(null);
   readonly linkPickerOptions = signal<string[]>([]);
+  readonly downloadPickerMovie = signal<Movie | null>(null);
+  readonly downloadPickerOptions = signal<string[]>([]);
   readonly playerOverlaySrc = signal<SafeResourceUrl | null>(null);
   readonly playerOverlayTitle = signal<string>('');
   readonly playerMaximized = signal(false);
   readonly playerHeaderHidden = signal(false);
   readonly detailMovie = signal<Movie | null>(null);
   readonly searchOpen = signal(false);
+  readonly searchDesktopFocused = signal(false);
 
   readonly favoritesSet = this.userData.favorites;
   readonly watchHistory = this.userData.history;
+  readonly searchHistory = this.userData.searchHistory;
 
   readonly displayedMovies = computed(() => {
     const list = this.movies();
@@ -216,16 +220,44 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onFilterInput(value: string): void {
+    // Escribir en el input NO ejecuta la búsqueda. La búsqueda se confirma con Enter o con la lupa.
     this.filterQuery.set(value);
-    if (this.filterDebounceTimer != null) clearTimeout(this.filterDebounceTimer);
-    this.filterDebounceTimer = setTimeout(() => {
-      this.filterDebounceTimer = null;
-      if (this.activeTab() === 'explore') {
-        this.loadFirstPage();
-      } else {
-        this.switchTab('explore');
-      }
-    }, 400);
+  }
+
+  submitSearch(): void {
+    this.searchOpen.set(false);
+    this.searchDesktopFocused.set(false);
+    this.runSearch(this.filterQuery());
+  }
+
+  clearSearch(): void {
+    this.filterQuery.set('');
+    this.searchOpen.set(false);
+    this.searchDesktopFocused.set(false);
+    this.runSearch('');
+  }
+
+  runSearch(query: string): void {
+    const q = query.trim();
+    this.filterQuery.set(q);
+    if (q) this.userData.addSearchQuery(q);
+    if (this.activeTab() !== 'explore') this.activeTab.set('explore');
+    this.loadFirstPage();
+  }
+
+  applySearchSuggestion(query: string): void {
+    this.searchOpen.set(false);
+    this.searchDesktopFocused.set(false);
+    this.runSearch(query);
+  }
+
+  onDesktopSearchFocus(): void {
+    this.searchDesktopFocused.set(true);
+  }
+
+  onDesktopSearchBlur(): void {
+    // Delay para permitir click en sugerencias antes de ocultarlas
+    setTimeout(() => this.searchDesktopFocused.set(false), 120);
   }
 
   toggleSearch(): void {
@@ -365,6 +397,22 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     this.linkPickerOptions.set([]);
   }
 
+  closeDownloadPicker(): void {
+    this.downloadPickerMovie.set(null);
+    this.downloadPickerOptions.set([]);
+  }
+
+  openDownloadPicker(movie: Movie): void {
+    const urls = movie.downloadUrls ?? (movie.downloadUrl ? [movie.downloadUrl] : []);
+    if (!urls.length) return;
+    if (urls.length === 1) {
+      window.open(urls[0]!, '_blank', 'noopener');
+      return;
+    }
+    this.downloadPickerMovie.set(movie);
+    this.downloadPickerOptions.set(urls);
+  }
+
   private activeScrollRef(): ElementRef<HTMLElement> | undefined {
     switch (this.activeTab()) {
       case 'home':      return this.homeScrollRef;
@@ -396,6 +444,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     if (event.key === 'Escape') {
       if (this.playerOverlaySrc()) { this.closePlayerOverlay(); return; }
       if (this.linkPickerMovie()) { this.closeLinkPicker(); return; }
+      if (this.downloadPickerMovie()) { this.closeDownloadPicker(); return; }
       if (this.detailMovie()) { this.closeDetail(); return; }
       if (this.searchOpen()) { this.searchOpen.set(false); return; }
     }
@@ -434,7 +483,21 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  showDetail(movie: Movie): void { this.detailMovie.set(movie); }
+  showDetail(movie: Movie): void {
+    // Mostrar rápido el detalle y luego enriquecer con todos los links de descarga (pueden venir en varias filas)
+    this.detailMovie.set(movie);
+    this.db.getDownloadOptionsForMovie(movie.originalName, movie.year).then((urls) => {
+      if (!urls.length) return;
+      const current = this.detailMovie();
+      // Si el usuario ya cerró/cambió, no tocar.
+      if (!current || current.id !== movie.id) return;
+      this.detailMovie.set({
+        ...current,
+        downloadUrls: urls,
+        downloadUrl: urls[0],
+      });
+    }).catch(() => {});
+  }
   closeDetail(): void { this.detailMovie.set(null); }
 
   playFromDetail(): void {

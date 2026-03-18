@@ -5,7 +5,9 @@ import type { Movie } from '../models/movie';
 const DB_PATH = 'assets/scrapgd.db';
 /** v_movies_catalog: name, year, quality, url_poster, preview. Para "Más recientes": upload_date (TEXT, formato YYYY-MM-DD HH:MM:SS). Opcional: file_size (si falta o es 'fail' no se muestra la película). */
 const CATALOG_VIEW = 'v_movies_catalog';
-const FILE_SIZE_FILTER = ` file_size IS NOT NULL AND LOWER(TRIM(CAST(file_size AS TEXT))) <> 'fail'`;
+const FILE_SIZE_FILTER = ` file_size IS NOT NULL
+  AND LENGTH(TRIM(CAST(file_size AS TEXT))) > 0
+  AND LOWER(TRIM(CAST(file_size AS TEXT))) NOT IN ('fail', 'null', 'none', 'n/a', 'na')`;
 
 interface SqlDbResultRow {
   columns: string[];
@@ -197,10 +199,90 @@ export class DbService {
     }
   }
 
-  private extractDownloadUrl(previewUrl: string): string | undefined {
-    const match = previewUrl.match(/\/file\/d\/([^/?]+)/);
-    if (match) return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+  /** Devuelve links de descarga para una película (name+year), 1:1 con filas/preview cuando sea posible. */
+  async getDownloadOptionsForMovie(name: string, year: number | string): Promise<string[]> {
+    const db = await this.openDb();
+    try {
+      const yearVal = typeof year === 'string' ? year : String(year);
+      const result = db.exec(
+        `SELECT download_url, preview FROM ${CATALOG_VIEW} WHERE${FILE_SIZE_FILTER} AND name = '${this.escapeSql(name)}' AND year = '${this.escapeSql(yearVal)}'`
+      );
+      db.close();
+      if (!result.length || !result[0].values.length) return [];
+      const { columns, values } = result[0];
+      const dlIdx = columns.indexOf('download_url');
+      const pvIdx = columns.indexOf('preview');
+      const all: string[] = [];
+      for (const row of values) {
+        const dl = dlIdx >= 0 ? row[dlIdx] : null;
+        const pv = pvIdx >= 0 ? String(row[pvIdx] ?? '') : '';
+        // Si una fila trae múltiples URLs, mantenemos el orden; NO deduplicamos
+        // para que la cantidad se parezca a la de previews.
+        const urls = this.parseDownloadUrls(dl, pv);
+        all.push(...urls);
+      }
+      return all.filter(Boolean);
+    } catch {
+      db.close();
+      return [];
+    }
+  }
+
+  private extractDriveFileId(url: string): string | undefined {
+    // /file/d/<id>/
+    const m1 = url.match(/\/file\/d\/([^/?]+)/);
+    if (m1?.[1]) return m1[1];
+    // open?id=<id>  o  uc?id=<id>
+    const m2 = url.match(/[?&]id=([^&]+)/);
+    if (m2?.[1]) return m2[1];
     return undefined;
+  }
+
+  private extractDownloadUrl(previewUrl: string): string | undefined {
+    const id = this.extractDriveFileId(previewUrl);
+    if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
+    return undefined;
+  }
+
+  private parseDownloadUrls(rawDownloadUrl: unknown, previewUrl: string): string[] {
+    const fallback = this.extractDownloadUrl(previewUrl);
+    if (rawDownloadUrl == null || String(rawDownloadUrl).trim() === '') {
+      return fallback ? [fallback] : [];
+    }
+
+    const raw = String(rawDownloadUrl).trim();
+
+    // Permite: JSON ["url1","url2"], o separados por |, coma, salto de línea, espacios.
+    if (raw.startsWith('[') && raw.endsWith(']')) {
+      try {
+        const arr = JSON.parse(raw) as unknown;
+        if (Array.isArray(arr)) {
+          const urls = arr
+            .map((v) => String(v ?? '').trim())
+            .filter((v) => v.startsWith('http://') || v.startsWith('https://'));
+          if (urls.length) return Array.from(new Set(urls));
+        }
+      } catch {
+        // cae al split de abajo
+      }
+    }
+
+    const parts = raw
+      .split(/[\n\r|,;\t ]+/g)
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+    // 1) URLs http(s)
+    const urls = parts.filter((v) => v.startsWith('http://') || v.startsWith('https://'));
+    if (urls.length) return urls;
+
+    // 2) IDs sueltos de Drive
+    const ids = parts
+      .filter((v) => /^[a-zA-Z0-9_-]{10,}$/.test(v))
+      .map((id) => `https://drive.google.com/uc?export=download&id=${id}`);
+    if (ids.length) return ids;
+
+    return fallback ? [fallback] : [];
   }
 
   private escapeSql(s: string): string {
@@ -271,8 +353,9 @@ export class DbService {
       ? String(rawSize)
       : undefined;
     const uploadDate = raw['upload_date'] != null ? String(raw['upload_date']) : undefined;
-    const rawDownload = raw['download_url'] != null ? String(raw['download_url']) : undefined;
-    const downloadUrl = rawDownload || this.extractDownloadUrl(String(raw['preview'] ?? ''));
+    const previewUrl = String(raw['preview'] ?? '');
+    const downloadUrls = this.parseDownloadUrls(raw['download_url'], previewUrl);
+    const downloadUrl = downloadUrls[0];
     return {
       id: raw['id'] != null ? String(raw['id']) : `movie-${index}`,
       title: name,
@@ -280,8 +363,9 @@ export class DbService {
       year,
       quality: String(raw['quality'] ?? ''),
       poster: raw['url_poster'] != null ? String(raw['url_poster']) : undefined,
-      videoUrl: String(raw['preview'] ?? ''),
+      videoUrl: previewUrl,
       downloadUrl,
+      downloadUrls: downloadUrls.length ? downloadUrls : undefined,
       uploadDate,
       fileSize,
     };

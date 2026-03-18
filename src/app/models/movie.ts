@@ -7,6 +7,7 @@ export interface Movie {
   quality: string;
   videoUrl: string;
   downloadUrl?: string;
+  downloadUrls?: string[];
   uploadDate?: string;
   fileSize?: string;
 }
