@@ -5,6 +5,7 @@ const KEY_LAST_WATCHED = 'viewpgd-last-watched';
 const KEY_FAVORITES = 'viewpgd-favorites';
 const KEY_HISTORY = 'viewpgd-history';
 const KEY_SEARCH_HISTORY = 'viewpgd-search-history';
+const KEY_USE_EXTERNAL_PLAYER = 'viewpgd-external-player';
 const MAX_HISTORY = 30;
 const MAX_SEARCH_HISTORY = 5;
 
@@ -26,11 +27,30 @@ export class UserDataService {
   private favoritesIds = signal<Set<string>>(this.loadFavorites());
   private historyList = signal<HistoryEntry[]>(this.loadHistory());
   private searchHistoryList = signal<string[]>(this.loadSearchHistory());
+  private externalPlayer = signal<boolean>(this.loadExternalPlayer());
 
   readonly lastWatchedMovie = this.lastWatched.asReadonly();
   readonly favorites = computed(() => new Set(this.favoritesIds()));
   readonly history = this.historyList.asReadonly();
   readonly searchHistory = this.searchHistoryList.asReadonly();
+  readonly useExternalPlayer = this.externalPlayer.asReadonly();
+
+  setUseExternalPlayer(value: boolean): void {
+    this.externalPlayer.set(value);
+    try {
+      localStorage.setItem(KEY_USE_EXTERNAL_PLAYER, JSON.stringify(value));
+    } catch {}
+  }
+
+  private loadExternalPlayer(): boolean {
+    try {
+      const raw = localStorage.getItem(KEY_USE_EXTERNAL_PLAYER);
+      if (raw == null) return false;
+      return JSON.parse(raw) === true;
+    } catch {
+      return false;
+    }
+  }
 
   isFavorite(id: string): boolean {
     return this.favoritesIds().has(id);

@@ -78,6 +78,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly detailMovie = signal<Movie | null>(null);
   readonly searchOpen = signal(false);
   readonly searchDesktopFocused = signal(false);
+  readonly settingsOpen = signal(false);
 
   readonly favoritesSet = this.userData.favorites;
   readonly watchHistory = this.userData.history;
@@ -359,6 +360,19 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   playMovie(movie: Movie): void {
     this.db.getPreviewOptionsForMovie(movie.originalName, movie.year).then((options) => {
       if (options.length === 0) return;
+
+      if (this.userData.useExternalPlayer()) {
+        // Externo: abrir en la app de Drive
+        if (options.length === 1) {
+          this.openInDrive(options[0]);
+          return;
+        }
+        this.linkPickerMovie.set(movie);
+        this.linkPickerOptions.set(options);
+        return;
+      }
+
+      // Interno: iframe
       if (options.length === 1) {
         this.navigateToPlayer(movie, options[0]);
         return;
@@ -368,11 +382,35 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  playWithPreference(movie: Movie, previewUrl: string): void {
+    if (this.userData.useExternalPlayer()) {
+      this.openInDrive(previewUrl);
+    } else {
+      this.navigateToPlayer(movie, previewUrl);
+    }
+  }
+
   navigateToPlayer(movie: Movie, previewUrl: string): void {
     this.closeLinkPicker();
     this.userData.setLastWatched({ ...movie, videoUrl: previewUrl });
     this.playerOverlaySrc.set(this.sanitizer.bypassSecurityTrustResourceUrl(previewUrl));
     this.playerOverlayTitle.set(movie.title);
+  }
+
+  openInDrive(previewUrl: string): void {
+    const driveUrl = this.previewToDriveUrl(previewUrl);
+    if (driveUrl) {
+      this.closeLinkPicker();
+      window.open(driveUrl, '_blank', 'noopener');
+    }
+  }
+
+  previewToDriveUrl(previewUrl: string): string | null {
+    const m1 = previewUrl.match(/\/file\/d\/([^/?]+)/);
+    if (m1?.[1]) return `https://drive.google.com/open?id=${m1[1]}`;
+    const m2 = previewUrl.match(/[?&]id=([^&]+)/);
+    if (m2?.[1]) return `https://drive.google.com/open?id=${m2[1]}`;
+    return null;
   }
 
   closePlayerOverlay(): void {
@@ -446,6 +484,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.linkPickerMovie()) { this.closeLinkPicker(); return; }
       if (this.downloadPickerMovie()) { this.closeDownloadPicker(); return; }
       if (this.detailMovie()) { this.closeDetail(); return; }
+      if (this.settingsOpen()) { this.settingsOpen.set(false); return; }
       if (this.searchOpen()) { this.searchOpen.set(false); return; }
     }
     if (event.key === '/' && !this.isInputFocused()) {

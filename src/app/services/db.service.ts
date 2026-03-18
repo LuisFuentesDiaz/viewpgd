@@ -244,6 +244,13 @@ export class DbService {
     return undefined;
   }
 
+  /** Convierte cualquier URL de Drive al formato de descarga directa; URLs no-Drive se devuelven tal cual. */
+  private toDriveDirectDownload(url: string): string {
+    const id = this.extractDriveFileId(url);
+    if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
+    return url;
+  }
+
   private parseDownloadUrls(rawDownloadUrl: unknown, previewUrl: string): string[] {
     const fallback = this.extractDownloadUrl(previewUrl);
     if (rawDownloadUrl == null || String(rawDownloadUrl).trim() === '') {
@@ -259,7 +266,8 @@ export class DbService {
         if (Array.isArray(arr)) {
           const urls = arr
             .map((v) => String(v ?? '').trim())
-            .filter((v) => v.startsWith('http://') || v.startsWith('https://'));
+            .filter((v) => v.startsWith('http://') || v.startsWith('https://'))
+            .map((v) => this.toDriveDirectDownload(v));
           if (urls.length) return Array.from(new Set(urls));
         }
       } catch {
@@ -272,8 +280,10 @@ export class DbService {
       .map((v) => v.trim())
       .filter(Boolean);
 
-    // 1) URLs http(s)
-    const urls = parts.filter((v) => v.startsWith('http://') || v.startsWith('https://'));
+    // 1) URLs http(s) — forzar formato descarga directa si es Drive
+    const urls = parts
+      .filter((v) => v.startsWith('http://') || v.startsWith('https://'))
+      .map((v) => this.toDriveDirectDownload(v));
     if (urls.length) return urls;
 
     // 2) IDs sueltos de Drive
