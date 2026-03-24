@@ -1,4 +1,8 @@
-<div class="app-shell" [class.app-shell--player-open]="playerOverlaySrc() != null">
+<div
+  class="app-shell"
+  [class.app-shell--player-open]="playerOverlaySrc() != null"
+  (contextmenu)="onAppContextMenu($event)"
+>
   <!-- ===== TOP NAV (desktop) ===== -->
   <header class="top-nav">
     <div class="top-nav__inner">
@@ -491,8 +495,23 @@
 
   <!-- DETAIL BOTTOM SHEET -->
   @if (detailMovie(); as movie) {
-    <div class="sheet-backdrop" (click)="closeDetail()"></div>
+    <div
+      class="sheet-backdrop sheet-backdrop--detail"
+      [class.sheet-backdrop--detail--pulled]="detailSheetDragY() > 0"
+      [style.background]="detailSheetDetailBackdropBackground()"
+      (click)="closeDetail()"
+    ></div>
     <div class="sheet sheet--detail" role="dialog" aria-modal="true">
+      <div
+        #detailSheetInner
+        class="sheet--detail__inner"
+        [class.sheet--detail__inner--dragging]="detailSheetDragging()"
+        [style.transform]="detailSheetInnerTransform()"
+      >
+      <!-- Indicador visual; el arrastre se maneja con listeners nativos (capture + non-passive) en todo el panel -->
+      <div class="detail__drag-strip">
+        <div class="detail__drag-handle" aria-hidden="true"></div>
+      </div>
 
       <!-- HERO con póster -->
       <div class="detail__hero">
@@ -575,6 +594,7 @@
             <span class="detail__info-value">{{ movie.year }}</span>
           </div>
         </div>
+      </div>
       </div>
     </div>
   }

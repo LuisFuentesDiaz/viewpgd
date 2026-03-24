@@ -4,6 +4,9 @@ import {
   signal,
   computed,
   effect,
+  afterNextRender,
+  Injector,
+  NgZone,
   OnInit,
   AfterViewInit,
   ViewChild,
@@ -44,6 +47,8 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly userData = inject(UserDataService);
   private router = inject(Router);
   private sanitizer = inject(DomSanitizer);
+  private injector = inject(Injector);
+  private ngZone = inject(NgZone);
 
   @ViewChild('movieGrid') movieGridRef?: ElementRef<HTMLUListElement>;
   @ViewChild('loadMoreSentinel') sentinelRef?: ElementRef<HTMLElement>;
@@ -51,6 +56,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('exploreScroll') exploreScrollRef?: ElementRef<HTMLElement>;
   @ViewChild('favoritesScroll') favoritesScrollRef?: ElementRef<HTMLElement>;
   @ViewChild('historyScroll') historyScrollRef?: ElementRef<HTMLElement>;
+  @ViewChild('detailSheetInner') detailSheetInnerRef?: ElementRef<HTMLElement>;
 
   readonly activeTab = signal<Tab>('home');
   readonly movies = signal<Movie[]>([]);
@@ -79,6 +85,41 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly searchOpen = signal(false);
   readonly searchDesktopFocused = signal(false);
   readonly settingsOpen = signal(false);
+
+  /** Cierre del sheet de detalle arrastrando hacia abajo (móvil). */
+  readonly detailSheetDragY = signal(0);
+  readonly detailSheetDragging = signal(false);
+  /**
+   * Al arrastrar: solo baja el alpha del fondo (sin tocar opacity del nodo: con blur suele verse más oscuro).
+   * Con y===0 devolvemos null para no pisar el CSS del .sheet-backdrop.
+   */
+  readonly detailSheetDetailBackdropBackground = computed((): string | null => {
+    const y = this.detailSheetDragY();
+    if (typeof window === 'undefined' || y <= 0) return null;
+    const maxY = Math.min(280, Math.max(160, window.innerHeight * 0.35));
+    const t = Math.min(1, y / maxY);
+    const a = Math.max(0.03, 0.65 * (1 - 0.92 * t));
+    return `rgba(0, 0, 0, ${a})`;
+  });
+  private detailSheetDragStartY = 0;
+  private detailPan: {
+    pointerId: number;
+    startY: number;
+    origin: 'strip' | 'hero' | 'body';
+    bodyEl: HTMLElement | null;
+    bodyScrollAtStart: number;
+    committed: boolean;
+  } | null = null;
+
+  private detailDragHost: HTMLElement | null = null;
+  private detailDocTouchListeners = false;
+  private readonly detailDragOpts: AddEventListenerOptions = { capture: true, passive: false };
+  private readonly boundDetailPointerDown = (e: Event) => this.onNativeDetailPointerDown(e as PointerEvent);
+  private readonly boundDetailPointerMove = (e: Event) => this.onNativeDetailPointerMove(e as PointerEvent);
+  private readonly boundDetailPointerUp = (e: Event) => this.onNativeDetailPointerUp(e as PointerEvent);
+  private readonly boundDetailTouchStart = (e: Event) => this.onNativeDetailTouchStart(e as TouchEvent);
+  private readonly boundDetailDocTouchMove = (e: Event) => this.onNativeDetailDocTouchMove(e as TouchEvent);
+  private readonly boundDetailDocTouchEnd = (e: Event) => this.onNativeDetailDocTouchEnd(e as TouchEvent);
 
   readonly favoritesSet = this.userData.favorites;
   readonly watchHistory = this.userData.history;
@@ -121,6 +162,21 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
       document.body.style.overflow = open ? 'hidden' : '';
       document.body.style.touchAction = open ? 'none' : '';
     });
+
+    effect(() => {
+      if (!this.detailMovie()) {
+        this.detachDetailSheetDragListeners();
+        return;
+      }
+      afterNextRender(
+        () => {
+          if (!this.detailMovie()) return;
+          const el = this.detailSheetInnerRef?.nativeElement;
+          if (el) this.attachDetailSheetDragListeners(el);
+        },
+        { injector: this.injector }
+      );
+    });
   }
 
   ngOnInit(): void {
@@ -141,7 +197,10 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
       const limited = years.slice(0, MAX_CAROUSEL_YEARS);
       return Promise.all(
         limited.map((year) =>
-          this.db.getMoviesPage(0, CAROUSEL_SIZE, undefined, 'year', 'desc', year).then((movies) => ({ year, movies }))
+          this.db
+            .getMoviesPage(0, CAROUSEL_SIZE, undefined, 'upload_date', 'desc', year)
+            .catch(() => this.db.getMoviesPage(0, CAROUSEL_SIZE, undefined, 'year', 'desc', year))
+            .then((movies) => ({ year, movies }))
         )
       );
     });
@@ -324,6 +383,7 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.detachDetailSheetDragListeners();
     document.body.style.overflow = '';
     document.body.style.touchAction = '';
     if (this.filterDebounceTimer != null) clearTimeout(this.filterDebounceTimer);
@@ -499,6 +559,14 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
   }
 
+  /** En móvil/táctil bloquea el menú de contexto por long-press del navegador. */
+  onAppContextMenu(event: MouseEvent): void {
+    if (typeof window === 'undefined') return;
+    if (!window.matchMedia('(max-width: 767px)').matches) return;
+    if (navigator.maxTouchPoints <= 0) return;
+    event.preventDefault();
+  }
+
   onCardPointerDown(event: Event, movie: Movie): void {
     this.longPressFired = false;
     this.longPressTimer = setTimeout(() => {
@@ -523,6 +591,9 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   showDetail(movie: Movie): void {
+    this.detailPan = null;
+    this.detailSheetDragY.set(0);
+    this.detailSheetDragging.set(false);
     // Mostrar rápido el detalle y luego enriquecer con todos los links de descarga (pueden venir en varias filas)
     this.detailMovie.set(movie);
     this.db.getDownloadOptionsForMovie(movie.originalName, movie.year).then((urls) => {
@@ -537,7 +608,226 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }).catch(() => {});
   }
-  closeDetail(): void { this.detailMovie.set(null); }
+  closeDetail(): void {
+    this.detachDetailSheetDragListeners();
+    this.detailPan = null;
+    this.detailSheetDragY.set(0);
+    this.detailSheetDragging.set(false);
+    this.detailMovie.set(null);
+  }
+
+  /** Solo translateY sobre el contenedor interno para no romper sheetUp del padre. */
+  detailSheetInnerTransform(): string {
+    return `translateY(${this.detailSheetDragY()}px)`;
+  }
+
+  private attachDetailSheetDragListeners(el: HTMLElement): void {
+    this.detachDetailSheetDragListeners();
+    this.detailDragHost = el;
+    if (this.useTouchDetailDrag()) {
+      el.addEventListener('touchstart', this.boundDetailTouchStart, this.detailDragOpts);
+      document.addEventListener('touchmove', this.boundDetailDocTouchMove, this.detailDragOpts);
+      document.addEventListener('touchend', this.boundDetailDocTouchEnd, this.detailDragOpts);
+      document.addEventListener('touchcancel', this.boundDetailDocTouchEnd, this.detailDragOpts);
+      this.detailDocTouchListeners = true;
+    } else {
+      el.addEventListener('pointerdown', this.boundDetailPointerDown, this.detailDragOpts);
+      el.addEventListener('pointermove', this.boundDetailPointerMove, this.detailDragOpts);
+      el.addEventListener('pointerup', this.boundDetailPointerUp, this.detailDragOpts);
+      el.addEventListener('pointercancel', this.boundDetailPointerUp, this.detailDragOpts);
+    }
+  }
+
+  private detachDetailSheetDragListeners(): void {
+    const el = this.detailDragHost;
+    if (this.detailDocTouchListeners) {
+      document.removeEventListener('touchmove', this.boundDetailDocTouchMove, this.detailDragOpts);
+      document.removeEventListener('touchend', this.boundDetailDocTouchEnd, this.detailDragOpts);
+      document.removeEventListener('touchcancel', this.boundDetailDocTouchEnd, this.detailDragOpts);
+      this.detailDocTouchListeners = false;
+    }
+    if (el) {
+      el.removeEventListener('touchstart', this.boundDetailTouchStart, this.detailDragOpts);
+      el.removeEventListener('pointerdown', this.boundDetailPointerDown, this.detailDragOpts);
+      el.removeEventListener('pointermove', this.boundDetailPointerMove, this.detailDragOpts);
+      el.removeEventListener('pointerup', this.boundDetailPointerUp, this.detailDragOpts);
+      el.removeEventListener('pointercancel', this.boundDetailPointerUp, this.detailDragOpts);
+    }
+    this.detailDragHost = null;
+  }
+
+  /** En móvil real usamos touch + document (iOS); si no hay touch, pointer (DevTools escritorio). */
+  private useTouchDetailDrag(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (!window.matchMedia('(max-width: 767px)').matches) return false;
+    return 'ontouchstart' in window && navigator.maxTouchPoints > 0;
+  }
+
+  private onNativeDetailPointerDown(event: PointerEvent): void {
+    if (!this.isDetailSheetDragAllowed(event)) return;
+    if (event.button !== 0) return;
+    this.beginDetailPanFromTarget(event.pointerId, event.clientY, event.target);
+  }
+
+  /** Inicia el gesto desde pointer o touch (mismo criterio de zona/origen). */
+  private beginDetailPanFromTarget(
+    pointerId: number,
+    clientY: number,
+    target: EventTarget | null,
+  ): void {
+    const t = target as HTMLElement;
+    if (t.closest('a[href]')) return;
+    const strip = t.closest('.detail__drag-strip');
+    const hero = t.closest('.detail__hero');
+    const body = t.closest('.detail__body') as HTMLElement | null;
+    let origin: 'strip' | 'hero' | 'body' = 'hero';
+    if (strip) origin = 'strip';
+    else if (body) origin = 'body';
+    else if (hero) origin = 'hero';
+
+    this.detailPan = {
+      pointerId,
+      startY: clientY,
+      origin,
+      bodyEl: body,
+      bodyScrollAtStart: body?.scrollTop ?? 0,
+      committed: false,
+    };
+  }
+
+  /**
+   * Actualiza translateY del sheet. Devuelve true si debe llamarse preventDefault.
+   * onJustCommitted: solo pointer (setPointerCapture en el primer frame comprometido).
+   */
+  private applyDetailPanMove(
+    clientY: number,
+    pointerId: number,
+    onJustCommitted?: () => void,
+  ): boolean {
+    const pan = this.detailPan;
+    const host = this.detailDragHost;
+    if (!pan || !host || pointerId !== pan.pointerId) return false;
+
+    if (!pan.committed) {
+      const dy = clientY - pan.startY;
+      if (Math.abs(dy) < 10) return false;
+
+      if (pan.origin === 'body') {
+        const b = pan.bodyEl;
+        if (b && (pan.bodyScrollAtStart > 0 || b.scrollTop > 0)) {
+          this.ngZone.run(() => {
+            this.detailPan = null;
+          });
+          return false;
+        }
+        if (dy <= 0) {
+          this.ngZone.run(() => {
+            this.detailPan = null;
+          });
+          return false;
+        }
+      } else {
+        if (dy <= 0) {
+          this.ngZone.run(() => {
+            this.detailPan = null;
+          });
+          return false;
+        }
+      }
+
+      pan.committed = true;
+      this.detailSheetDragStartY = pan.startY;
+      this.ngZone.run(() => {
+        this.detailSheetDragging.set(true);
+      });
+      onJustCommitted?.();
+    }
+
+    const offset = clientY - this.detailSheetDragStartY;
+    this.ngZone.run(() => {
+      this.detailSheetDragY.set(Math.max(0, offset));
+    });
+    return true;
+  }
+
+  private applyDetailPanEnd(pointerId: number): void {
+    const pan = this.detailPan;
+    if (!pan || pointerId !== pan.pointerId) return;
+
+    if (pan.committed) {
+      this.ngZone.run(() => {
+        this.detailSheetDragging.set(false);
+        const y = this.detailSheetDragY();
+        const threshold = Math.min(120, Math.max(80, window.innerHeight * 0.15));
+        if (y > threshold) {
+          this.closeDetail();
+        } else {
+          this.detailSheetDragY.set(0);
+        }
+      });
+    }
+    this.detailPan = null;
+  }
+
+  private onNativeDetailPointerMove(event: PointerEvent): void {
+    const shouldPrevent = this.applyDetailPanMove(event.clientY, event.pointerId, () => {
+      const host = this.detailDragHost;
+      if (!host) return;
+      try {
+        host.setPointerCapture(event.pointerId);
+      } catch {
+        /* noop */
+      }
+    });
+    if (shouldPrevent) event.preventDefault();
+  }
+
+  private onNativeDetailPointerUp(event: PointerEvent): void {
+    const pan = this.detailPan;
+    const host = this.detailDragHost;
+    if (!pan || event.pointerId !== pan.pointerId) return;
+
+    if (pan.committed && host) {
+      try {
+        host.releasePointerCapture(event.pointerId);
+      } catch {
+        /* noop */
+      }
+    }
+    this.applyDetailPanEnd(event.pointerId);
+  }
+
+  private onNativeDetailTouchStart(event: TouchEvent): void {
+    if (!this.detailDragHost || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    this.beginDetailPanFromTarget(touch.identifier, touch.clientY, touch.target);
+    // No preventDefault: no bloquear tap/scroll hasta confirmar arrastre en touchmove.
+  }
+
+  private onNativeDetailDocTouchMove(event: TouchEvent): void {
+    const pan = this.detailPan;
+    if (!pan) return;
+    const touch = Array.from(event.touches).find((t) => t.identifier === pan.pointerId);
+    if (!touch) return;
+    const shouldPrevent = this.applyDetailPanMove(touch.clientY, pan.pointerId);
+    if (shouldPrevent) event.preventDefault();
+  }
+
+  private onNativeDetailDocTouchEnd(event: TouchEvent): void {
+    const pan = this.detailPan;
+    if (!pan) return;
+    const ended = Array.from(event.changedTouches).find((t) => t.identifier === pan.pointerId);
+    if (!ended) return;
+    this.applyDetailPanEnd(pan.pointerId);
+  }
+
+  private isDetailSheetDragAllowed(event: PointerEvent): boolean {
+    if (typeof window === 'undefined') return false;
+    if (!window.matchMedia('(max-width: 767px)').matches) return false;
+    if (event.pointerType === 'touch' || event.pointerType === 'pen') return true;
+    if (event.pointerType === 'mouse' && navigator.maxTouchPoints > 0) return true;
+    return false;
+  }
 
   playFromDetail(): void {
     const movie = this.detailMovie();

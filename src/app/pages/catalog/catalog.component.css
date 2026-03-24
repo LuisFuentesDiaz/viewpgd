@@ -9,6 +9,13 @@
   position: relative;
 }
 
+@media (max-width: 767px) {
+  /* Evita callout/context menu de iOS por mantener pulsado. */
+  .app-shell {
+    -webkit-touch-callout: none;
+  }
+}
+
 .main-content {
   flex: 1;
   overflow: hidden;
@@ -497,9 +504,51 @@
 .fab-scroll-top:active { transform: scale(0.95); }
 
 /* ===== BOTTOM SHEET (Detail / Link Picker) ===== */
-.sheet-backdrop { position: fixed; inset: 0; z-index: 300; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(8px); animation: fadeIn 0.15s ease; }
-.sheet { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 301; width: 100%; max-width: 480px; max-height: 85dvh; overflow-y: auto; background: var(--vp-surface-solid); border-top-left-radius: var(--vp-radius-xl); border-top-right-radius: var(--vp-radius-xl); box-shadow: var(--vp-shadow-xl); animation: sheetUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 300; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: fadeIn 0.15s ease; }
+/* Solo detalle: al tirar del sheet, quitar blur (en WebKit + opacity oscurecía mucho el fondo). */
+.sheet-backdrop--detail.sheet-backdrop--detail--pulled {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.sheet { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 301; width: 100%; max-width: 480px; max-height: 85dvh; overflow-y: auto; background: transparent; border-top-left-radius: var(--vp-radius-xl); border-top-right-radius: var(--vp-radius-xl); box-shadow: var(--vp-shadow-xl); animation: sheetUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .sheet--detail { max-height: 92dvh; overflow: hidden; display: flex; flex-direction: column; }
+.sheet--detail__inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--vp-surface-solid);
+  border-top-left-radius: var(--vp-radius-xl);
+  border-top-right-radius: var(--vp-radius-xl);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (max-width: 767px) {
+  .sheet--detail__inner { touch-action: pan-y; }
+}
+.sheet--detail__inner--dragging { transition: none; touch-action: none; }
+
+.detail__drag-strip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0.35rem 0 0.15rem;
+  cursor: grab;
+  background: var(--vp-surface-solid);
+  border-top-left-radius: var(--vp-radius-xl);
+  border-top-right-radius: var(--vp-radius-xl);
+}
+.detail__drag-strip:active { cursor: grabbing; }
+.detail__drag-handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.22);
+}
+@media (min-width: 768px) {
+  .detail__drag-strip { display: none; }
+}
 .sheet--compact { max-height: 60dvh; }
 .sheet__handle { width: 36px; height: 4px; background: rgba(255, 255, 255, 0.15); border-radius: 2px; margin: 0.6rem auto 0; }
 .sheet__poster-area { width: 100%; aspect-ratio: 16 / 9; background: #000; position: relative; overflow: hidden; }
