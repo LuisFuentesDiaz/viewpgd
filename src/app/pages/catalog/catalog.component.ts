@@ -170,9 +170,18 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       afterNextRender(
         () => {
-          if (!this.detailMovie()) return;
-          const el = this.detailSheetInnerRef?.nativeElement;
-          if (el) this.attachDetailSheetDragListeners(el);
+          const tryAttach = (attempt = 0): void => {
+            if (!this.detailMovie()) return;
+            const el = this.detailSheetInnerRef?.nativeElement;
+            if (el) {
+              this.attachDetailSheetDragListeners(el);
+              return;
+            }
+            if (attempt < 24) {
+              requestAnimationFrame(() => tryAttach(attempt + 1));
+            }
+          };
+          requestAnimationFrame(() => tryAttach());
         },
         { injector: this.injector }
       );
@@ -656,11 +665,16 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     this.detailDragHost = null;
   }
 
-  /** En móvil real usamos touch + document (iOS); si no hay touch, pointer (DevTools escritorio). */
+  /**
+   * Touch + listeners en document: iOS y la mayoría de móviles.
+   * Si no hay superficie táctil reportada (p. ej. Chrome responsive con ratón), usamos pointer.
+   */
   private useTouchDetailDrag(): boolean {
     if (typeof window === 'undefined') return false;
     if (!window.matchMedia('(max-width: 767px)').matches) return false;
-    return 'ontouchstart' in window && navigator.maxTouchPoints > 0;
+    if (!('ontouchstart' in window)) return false;
+    if (navigator.maxTouchPoints > 0) return true;
+    return window.matchMedia('(pointer: coarse)').matches;
   }
 
   private onNativeDetailPointerDown(event: PointerEvent): void {
@@ -825,7 +839,8 @@ export class CatalogComponent implements OnInit, AfterViewInit, OnDestroy {
     if (typeof window === 'undefined') return false;
     if (!window.matchMedia('(max-width: 767px)').matches) return false;
     if (event.pointerType === 'touch' || event.pointerType === 'pen') return true;
-    if (event.pointerType === 'mouse' && navigator.maxTouchPoints > 0) return true;
+    // Ratón en viewport estrecho (emulación móvil, ventana pequeña): sin esto el drag pointer nunca arranca.
+    if (event.pointerType === 'mouse') return true;
     return false;
   }
 
