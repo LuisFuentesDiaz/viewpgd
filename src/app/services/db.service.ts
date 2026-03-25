@@ -128,7 +128,7 @@ export class DbService {
     const db = await this.openDb();
     try {
       let where = FILE_SIZE_FILTER;
-      if (search?.trim()) where += ` AND LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
+      where += this.buildSearchWhereClause(search);
       if (year != null && !Number.isNaN(year)) where += ` AND year = ${year}`;
       const result = db.exec(
         `SELECT COUNT(*) AS n FROM (SELECT name, year FROM ${CATALOG_VIEW} WHERE${where} GROUP BY name, year)`
@@ -154,7 +154,7 @@ export class DbService {
     const db = await this.openDb();
     try {
       let where = FILE_SIZE_FILTER;
-      if (search?.trim()) where += ` AND LOWER(name) LIKE '%' || LOWER('${this.escapeSql(search.trim())}') || '%'`;
+      where += this.buildSearchWhereClause(search);
       if (year != null && !Number.isNaN(year)) where += ` AND year = ${year}`;
       const ob = orderBy === 'name' ? 'name' : orderBy === 'upload_date' ? 'upload_date' : 'year';
       const dir = order === 'asc' ? 'ASC' : 'DESC';
@@ -299,6 +299,46 @@ export class DbService {
     return s.replace(/\\/g, '\\\\').replace(/'/g, "''");
   }
 
+  /**
+   * Texto comparable en búsqueda: sin distinguir mayúsculas y sin tildes (es-ES).
+   * Ñ permanece como ñ; el resto de diacríticos se eliminan vía NFD.
+   */
+  static foldForSearch(s: string): string {
+    if (!s) return '';
+    try {
+      return s
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+        .toLocaleLowerCase('es');
+    } catch {
+      return s.toLowerCase();
+    }
+  }
+
+  /** Escapa % _ \ para LIKE … ESCAPE '\\'. */
+  private escapeLikeMetacharacters(s: string): string {
+    return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  }
+
+  /**
+   * Filtro por nombre tolerante (mayúsculas / tildes) usando función JS registrada en SQLite.
+   */
+  private buildSearchWhereClause(search?: string): string {
+    const t = search?.trim();
+    if (!t) return '';
+    const likeSafe = this.escapeLikeMetacharacters(t);
+    const folded = DbService.foldForSearch(likeSafe);
+    const lit = this.escapeSql(folded);
+    return ` AND vpd_fold(name) LIKE '%' || vpd_fold('${lit}') || '%' ` + "ESCAPE '\\'";
+  }
+
+  private registerSearchFold(db: { create_function: (name: string, fn: (...args: unknown[]) => unknown) => void }): void {
+    db.create_function('vpd_fold', (x: unknown) => {
+      if (x == null) return '';
+      return DbService.foldForSearch(String(x));
+    });
+  }
+
   private async openDb(): Promise<{ exec: (sql: string) => SqlDbResultRow[]; close: () => void }> {
     const initSqlJs = await this.loadSqlJs();
     const baseRaw = this.baseHref ?? '/';
@@ -315,7 +355,9 @@ export class DbService {
       if (!response.ok) throw new Error(`No se pudo cargar la base de datos: ${response.status}`);
       buffer = await response.arrayBuffer();
     }
-    return new SQL.Database(new Uint8Array(buffer));
+    const db = new SQL.Database(new Uint8Array(buffer));
+    this.registerSearchFold(db as unknown as { create_function: (name: string, fn: (...args: unknown[]) => unknown) => void });
+    return db;
   }
 
   /** Lee la vista v_movies_catalog; una fila por película (name+year), un solo link. */
